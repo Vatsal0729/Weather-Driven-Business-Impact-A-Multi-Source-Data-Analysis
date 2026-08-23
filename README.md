@@ -7,7 +7,7 @@
 [![Tests](https://img.shields.io/badge/Tests-Pytest_Passing-success.svg)](https://pytest.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-An enterprise analytics engine that measures, isolates, and forecasts the real-world financial impact of weather events on commercial businesses. Using econometric Two-Way Fixed Effects (TWFE) models, it separates genuine weather alpha from seasonal calendar confounding across 16+ sectors, maps cross-business domino ripple effects, and provides live "What-If" scenario simulation with 7-day forward revenue forecasting in a modern dark UI.
+An enterprise analytics engine that measures, isolates, and forecasts the real-world financial impact of weather events on commercial businesses. Using econometric Two-Way Fixed Effects (TWFE) models, it separates genuine weather alpha from seasonal calendar confounding across 16+ sectors, maps cross-business domino ripple effects, and provides live "What-If" scenario simulation with 7-day forward revenue forecasting.
 
 ---
 
