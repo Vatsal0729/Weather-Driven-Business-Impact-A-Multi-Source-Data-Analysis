@@ -1,0 +1,1294 @@
+"""
+Enterprise Weather Intelligence Platform.
+Full Production Implementation:
+- Obsidian & Electric Accents Palette (Raycast / Linear / Stripe Modern Executive Dark)
+- 16+ Preset Business Categories across all industries with distinct visual palettes
+- Dynamic On-The-Fly Custom Business Synthesizer
+- 6 Business Sectors with 21 Econometric Impact Metrics
+- Higher-Order Multi-Hop Causal Chains & Domino Spillovers
+- Asynchronous Multi-Source Data Alignment Diagnostics (UTC Weather + Local POS)
+- True Weather Effect vs Seasonal Confounder Disentanglement (TWFE)
+- Live Interactive "What-If" Scenario Simulator
+- Custom Tooltips on Line & Marker Hover (Business Name, Day, Date, Weather Type & Metrics)
+"""
+
+import os
+import json
+import pandas as pd
+import numpy as np
+import streamlit as st
+import plotly.express as px
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+
+from src.econometrics import WeatherEconometricsEngine
+from src.revenue_analytics import (
+    BUSINESS_CATALOG,
+    infer_custom_business_parameters,
+    calculate_custom_business_daily_series,
+    generate_business_specific_why_insight,
+    analyze_inter_business_linkages,
+    generate_future_ai_forecast,
+    aggregate_daily_financials
+)
+
+# Standard High-Visibility Palette
+HIGH_VISIBILITY_PALETTE = [
+    "#00D2FF",  # Bright Cyan Blue
+    "#FF9100",  # Vivid Amber Orange
+    "#00E676",  # Vibrant Emerald Green
+    "#FF5252",  # Vivid Coral Red
+    "#B388FF",  # Electric Lavender Purple
+    "#76FF03",  # High-Vis Electric Lime
+    "#FF4081",  # Hot Pink
+    "#00E5FF",  # Bright Turquoise Aqua
+    "#FFD600",  # High-Vis Lemon Gold
+    "#E040FB",  # Vibrant Magenta
+    "#1DE9B6",  # Seafoam Teal
+    "#FF6D00",  # Bright Tangerine Orange
+    "#448AFF",  # Bright Royal Blue
+    "#00C853",  # Deep Grass Green
+    "#FF1744",  # High-Vis Crimson
+    "#7C4DFF",  # Bright Electric Violet
+]
+
+# Page configuration
+st.set_page_config(
+    page_title="Weather Business Intelligence",
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)
+
+# Modern Executive Dark Glass Styling
+st.markdown("""
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700;800&display=swap');
+    
+    /* Global Base */
+    html, body, [class*="css"], .stApp {
+        font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+        color: #F8FAFC !important;
+        background-color: #0B0F19 !important;
+    }
+    
+    .block-container {
+        padding-top: 1.8rem;
+        padding-bottom: 3.5rem;
+        padding-left: 2.2rem;
+        padding-right: 2.2rem;
+        max-width: 100%;
+        background-color: #0B0F19;
+    }
+    
+    /* Header Banner */
+    .hero-container {
+        background: linear-gradient(135deg, rgba(17, 24, 39, 0.85) 0%, rgba(15, 23, 42, 0.95) 100%);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 12px;
+        padding: 24px 30px;
+        margin-bottom: 22px;
+        box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.4);
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .hero-container::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: linear-gradient(90deg, #38BDF8 0%, #818CF8 50%, #34D399 100%);
+    }
+    
+    .hero-top-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 6px;
+    }
+    
+    .hero-title {
+        font-size: 1.65rem;
+        font-weight: 800;
+        letter-spacing: -0.03em;
+        color: #FFFFFF;
+        text-transform: uppercase;
+    }
+    
+    .live-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: rgba(56, 189, 248, 0.1);
+        border: 1px solid rgba(56, 189, 248, 0.3);
+        color: #38BDF8;
+        font-size: 0.72rem;
+        font-weight: 700;
+        padding: 4px 10px;
+        border-radius: 20px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+    }
+    
+    .live-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background-color: #38BDF8;
+        box-shadow: 0 0 8px #38BDF8;
+    }
+    
+    .hero-subtitle {
+        font-size: 0.88rem;
+        color: #94A3B8;
+        font-weight: 500;
+        line-height: 1.4;
+    }
+    
+    /* Full Width Even Tabs */
+    .stTabs [data-baseweb="tab-list"] {
+        display: flex;
+        width: 100%;
+        gap: 0px;
+        background-color: #111827;
+        padding: 4px;
+        border-radius: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        margin-bottom: 24px;
+    }
+    
+    .stTabs [data-baseweb="tab"] {
+        flex: 1;
+        height: 44px;
+        border-radius: 7px;
+        padding: 0 10px;
+        background-color: transparent;
+        border: none;
+        color: #94A3B8;
+        font-weight: 700;
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    .stTabs [aria-selected="true"] {
+        background: linear-gradient(180deg, #1E293B 0%, #0F172A 100%) !important;
+        color: #38BDF8 !important;
+        font-weight: 800;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(56, 189, 248, 0.25) !important;
+    }
+    
+    .stTabs [data-baseweb="tab-highlight"],
+    .stTabs [data-baseweb="tab-border"] {
+        display: none !important;
+    }
+    
+    /* Metric Cards */
+    .metric-grid-card {
+        background: linear-gradient(180deg, #161F30 0%, #111827 100%);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 10px;
+        padding: 18px 20px;
+        height: 120px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        box-sizing: border-box;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+        transition: transform 0.15s ease, border-color 0.15s ease;
+    }
+    
+    .metric-grid-card:hover {
+        border-color: rgba(56, 189, 248, 0.3);
+        transform: translateY(-2px);
+    }
+    
+    .metric-label {
+        font-size: 0.74rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #94A3B8;
+    }
+    
+    .metric-number {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 1.85rem;
+        font-weight: 800;
+        letter-spacing: -0.04em;
+        color: #FFFFFF;
+        line-height: 1.05;
+    }
+    
+    .metric-subtext {
+        font-size: 0.78rem;
+        color: #64748B;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    /* Insight & Sector Cards */
+    .insight-box {
+        background: linear-gradient(180deg, #161F30 0%, #111827 100%);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 10px;
+        padding: 20px;
+        min-height: 240px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        margin-bottom: 20px;
+        box-sizing: border-box;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+    }
+    
+    .insight-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 10px;
+    }
+    
+    .insight-title {
+        font-size: 0.98rem;
+        font-weight: 800;
+        color: #FFFFFF;
+        letter-spacing: -0.02em;
+    }
+    
+    .insight-content {
+        font-size: 0.85rem;
+        color: #CBD5E1;
+        line-height: 1.55;
+        margin-top: 8px;
+        flex-grow: 1;
+    }
+    
+    .insight-bottom {
+        font-size: 0.74rem;
+        font-weight: 700;
+        color: #64748B;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+        padding-top: 10px;
+        margin-top: 14px;
+    }
+    
+    /* Badges */
+    .status-positive {
+        background: rgba(16, 185, 129, 0.15);
+        color: #34D399;
+        border: 1px solid rgba(16, 185, 129, 0.35);
+        padding: 2px 8px;
+        border-radius: 5px;
+        font-weight: 700;
+        font-size: 0.74rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+    
+    .status-negative {
+        background: rgba(244, 63, 94, 0.15);
+        color: #FB7185;
+        border: 1px solid rgba(244, 63, 94, 0.35);
+        padding: 2px 8px;
+        border-radius: 5px;
+        font-weight: 700;
+        font-size: 0.74rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+    
+    .status-neutral {
+        background: rgba(148, 163, 184, 0.12);
+        color: #94A3B8;
+        border: 1px solid rgba(148, 163, 184, 0.25);
+        padding: 2px 8px;
+        border-radius: 5px;
+        font-weight: 600;
+        font-size: 0.74rem;
+        text-transform: uppercase;
+    }
+    
+    /* Multi-Hop Domino Chain Box */
+    .domino-chain-container {
+        background: linear-gradient(180deg, #161F30 0%, #111827 100%);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 10px;
+        padding: 22px 24px;
+        margin-bottom: 22px;
+    }
+    
+    .domino-step {
+        background-color: #0F172A;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 7px;
+        padding: 12px 16px;
+        margin-bottom: 10px;
+        font-size: 0.88rem;
+        font-weight: 600;
+        color: #F8FAFC;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        transition: border-color 0.15s ease;
+    }
+    
+    .domino-step:hover {
+        border-color: rgba(56, 189, 248, 0.3);
+    }
+    
+    .domino-num {
+        background: linear-gradient(135deg, #0284C7 0%, #38BDF8 100%);
+        color: #FFFFFF;
+        font-size: 0.75rem;
+        font-weight: 800;
+        padding: 3px 8px;
+        border-radius: 5px;
+        min-width: 24px;
+        text-align: center;
+        box-shadow: 0 2px 6px rgba(56, 189, 248, 0.3);
+    }
+    
+    /* Ripple Item Box */
+    .ripple-box {
+        background: linear-gradient(180deg, #161F30 0%, #111827 100%);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 10px;
+        padding: 20px 22px;
+        margin-bottom: 18px;
+    }
+    
+    .ripple-title {
+        font-size: 1.02rem;
+        font-weight: 800;
+        color: #FFFFFF;
+    }
+    
+    .chain-step {
+        background-color: #0F172A;
+        border-left: 3px solid #38BDF8;
+        border-radius: 0 6px 6px 0;
+        padding: 9px 14px;
+        margin-bottom: 7px;
+        font-size: 0.85rem;
+        color: #CBD5E1;
+    }
+    
+    /* Sector Scenario Cards */
+    .sector-grid-card {
+        background: linear-gradient(180deg, #161F30 0%, #111827 100%);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 10px;
+        padding: 16px 18px;
+        margin-bottom: 16px;
+    }
+    
+    .sector-title {
+        font-size: 0.92rem;
+        font-weight: 800;
+        color: #38BDF8;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        padding-bottom: 6px;
+        margin-bottom: 10px;
+    }
+    
+    .metric-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 6px 0;
+        font-size: 0.85rem;
+        color: #CBD5E1;
+        border-bottom: 1px dashed rgba(255, 255, 255, 0.05);
+    }
+    
+    /* AI Guidance Box */
+    .ai-guidance-card {
+        background: linear-gradient(180deg, #161F30 0%, #111827 100%);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-left: 5px solid #38BDF8;
+        border-radius: 8px;
+        padding: 16px 20px;
+        margin-bottom: 12px;
+        font-size: 0.88rem;
+        color: #F8FAFC;
+        line-height: 1.6;
+    }
+    
+    /* Native UI Input Overrides */
+    div[data-testid="stExpander"] {
+        background-color: #111827 !important;
+        border: 1px solid rgba(255, 255, 255, 0.08) !important;
+        border-radius: 10px !important;
+    }
+    
+    .stSelectbox, .stMultiSelect, .stTextInput, .stNumberInput {
+        color: #F8FAFC !important;
+    }
+    
+    /* Multiselect Selected Tag Pills */
+    span[data-baseweb="tag"] {
+        background-color: #1E293B !important;
+        border: 1px solid rgba(56, 189, 248, 0.3) !important;
+        border-radius: 5px !important;
+        padding: 2px 8px !important;
+    }
+    
+    span[data-baseweb="tag"] span,
+    span[data-baseweb="tag"] div {
+        color: #F8FAFC !important;
+        font-weight: 600 !important;
+    }
+    
+    span[data-baseweb="tag"] svg {
+        fill: #94A3B8 !important;
+    }
+    
+    span[data-baseweb="tag"]:hover svg {
+        fill: #38BDF8 !important;
+    }
+
+    /* Dropdown Menus & Select Containers */
+    div[data-baseweb="select"] > div {
+        background-color: #111827 !important;
+        border: 1px solid rgba(255, 255, 255, 0.12) !important;
+        border-radius: 8px !important;
+    }
+
+    div[data-baseweb="popover"], div[data-baseweb="menu"], ul[role="listbox"] {
+        background-color: #111827 !important;
+        border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    }
+
+    li[role="option"] {
+        background-color: #111827 !important;
+        color: #F8FAFC !important;
+    }
+
+    li[role="option"]:hover, li[role="option"][aria-selected="true"] {
+        background-color: #1E293B !important;
+        color: #38BDF8 !important;
+    }
+    
+    .stButton > button {
+        background: linear-gradient(135deg, #0284C7 0%, #38BDF8 100%) !important;
+        color: #FFFFFF !important;
+        border: none !important;
+        border-radius: 8px !important;
+        font-weight: 700 !important;
+        box-shadow: 0 4px 12px rgba(56, 189, 248, 0.3) !important;
+        transition: all 0.15s ease;
+    }
+    
+    .stButton > button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 6px 16px rgba(56, 189, 248, 0.45) !important;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+
+@st.cache_resource
+def load_base_data():
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    data_path = os.path.join(base_dir, "data", "processed", "weather_business_merged.parquet")
+    engine = WeatherEconometricsEngine(data_path)
+    engine.fit_sector_models()
+    df_daily = aggregate_daily_financials(engine.df)
+    return engine, df_daily
+
+try:
+    engine, df_daily_base = load_base_data()
+except Exception as e:
+    st.error(f"Error loading data pipeline: {e}")
+    st.stop()
+
+
+# Session State Management for Dynamic Custom Businesses
+if "custom_businesses" not in st.session_state:
+    st.session_state.custom_businesses = {}
+
+# Active Dynamic Catalog (Preset + User Created)
+active_catalog = {**BUSINESS_CATALOG, **st.session_state.custom_businesses}
+
+# Top Hero Header
+st.markdown("""
+<div class="hero-container">
+    <div class="hero-top-row">
+        <div class="hero-title">Weather-Driven Business Intelligence</div>
+        <div class="live-badge"><span class="live-dot"></span> Live Multi-Source Telemetry</div>
+    </div>
+    <div class="hero-subtitle">Multi-Source Econometric Analysis, Dynamic Business Synthesis, and Cross-Sector Causal Forecasting.</div>
+</div>
+""", unsafe_allow_html=True)
+
+# Control Bar: Business Selection & Region
+catalog_options = {k: v["name"] for k, v in active_catalog.items()}
+
+if "selected_businesses" not in st.session_state:
+    st.session_state.selected_businesses = ["food_delivery", "dine_in_restaurant", "retail_apparel"]
+
+ctrl_col1, ctrl_col2 = st.columns([3.2, 1.0])
+
+with ctrl_col1:
+    selected_keys = st.multiselect(
+        "Select Businesses to Monitor (16+ Preset Categories or Custom Created):",
+        options=list(catalog_options.keys()),
+        default=[k for k in st.session_state.selected_businesses if k in catalog_options],
+        format_func=lambda x: f"{catalog_options[x]} [{active_catalog[x].get('category', 'General')}]",
+        help="Select business categories from the expanded catalog or create a novel custom category below."
+    )
+    st.session_state.selected_businesses = selected_keys
+
+with ctrl_col2:
+    city_names = {"NYC": "New York City", "ORD": "Chicago", "SEA": "Seattle", "PHX": "Phoenix"}
+    selected_city = st.selectbox(
+        "City Market:",
+        options=list(city_names.keys()),
+        format_func=lambda x: f"{city_names[x]} ({x})"
+    )
+
+# ==============================================================================
+# ON-THE-FLY CUSTOM BUSINESS CREATOR
+# ==============================================================================
+with st.expander("+ Create & Add a New Custom Business Category from Scratch"):
+    st.markdown("Type any business category (e.g. *'Pet Grooming Salon'*, *'Lawn Care & Landscaping'*, *'Rooftop Cocktail Lounge'*, *'Surf & Beach Rental'*) to automatically synthesize econometric elasticities and performance stats.")
+    
+    cc1, cc2, cc3 = st.columns([2.0, 1.5, 1.0])
+    with cc1:
+        new_biz_name = st.text_input("New Business Name:", placeholder="e.g., Rooftop Cocktail Lounge or Pet Daycare")
+    with cc2:
+        new_biz_cat = st.selectbox("Industry Classification:", [
+            "Auto-Detect from Name",
+            "Outdoor & Leisure",
+            "Indoor Entertainment",
+            "Home & Emergency Services",
+            "Health & Wellness",
+            "Food & Hospitality",
+            "Retail & Commerce",
+            "Logistics & Transport",
+            "Automotive Care",
+            "Chilled Refreshments",
+            "Hot Food & Beverages"
+        ])
+    with cc3:
+        st.write("&nbsp;")
+        add_btn = st.button("Synthesize & Add", use_container_width=True)
+        
+    with st.expander("Optional: Fine-Tune Sensitivity & Chart Line Color"):
+        tc1, tc2, tc3, tc4 = st.columns([1.2, 1.2, 1.2, 1.0])
+        with tc1:
+            custom_rev_input = st.number_input("Base Daily Sales ($ USD):", min_value=1000, max_value=500000, value=35000, step=5000)
+        with tc2:
+            custom_rain_input = st.slider("Rain Sensitivity (% per mm):", min_value=-20.0, max_value=20.0, value=0.0, step=0.5)
+        with tc3:
+            custom_temp_input = st.slider("Heat Sensitivity (% per °C):", min_value=-15.0, max_value=15.0, value=0.0, step=0.5)
+        with tc4:
+            default_color = HIGH_VISIBILITY_PALETTE[len(st.session_state.custom_businesses) % len(HIGH_VISIBILITY_PALETTE)]
+            custom_color_choice = st.color_picker("Line Color:", value=default_color)
+
+    if add_btn and new_biz_name.strip():
+        inferred = infer_custom_business_parameters(
+            name=new_biz_name,
+            category_hint=new_biz_cat,
+            custom_color=custom_color_choice,
+            custom_rev=custom_rev_input,
+            custom_rain=custom_rain_input if custom_rain_input != 0 else None,
+            custom_temp=custom_temp_input if custom_temp_input != 0 else None,
+            existing_count=len(st.session_state.custom_businesses)
+        )
+        new_slug = inferred["slug"]
+        if new_slug in active_catalog:
+            new_slug = f"{new_slug}_{len(st.session_state.custom_businesses) + 1}"
+            
+        st.session_state.custom_businesses[new_slug] = inferred["config"]
+        if new_slug not in st.session_state.selected_businesses:
+            st.session_state.selected_businesses.append(new_slug)
+        st.success(f"Successfully created '{inferred['config']['name']}' under '{inferred['config']['category']}' with color {inferred['config']['color']}! (Rain Elasticity: {inferred['config']['rain_elasticity']*100:+.1f}%, Temp Elasticity: {inferred['config']['temp_elasticity']*100:+.1f}%)")
+        st.rerun()
+
+if not selected_keys:
+    st.info("Please select at least one business above or create a new custom business to view the analysis.")
+    st.stop()
+
+# Compute tailored series across active catalog
+city_daily = df_daily_base[df_daily_base["metro_area"] == selected_city].copy()
+city_daily_custom = calculate_custom_business_daily_series(city_daily, selected_keys, custom_catalog=active_catalog)
+
+
+# ==============================================================================
+# 5 FULL-SPAN TABS
+# ==============================================================================
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    "Weekly Operational Impact",
+    "Historical Trends & Seasonality",
+    "Business Interactions & Domino Chains",
+    "Live Scenario Simulator & AI Guidance",
+    "Multi-Source Data Wrangling Diagnostics"
+])
+
+
+# ==============================================================================
+# TAB 1: WEEKLY OPERATIONAL IMPACT
+# ==============================================================================
+with tab1:
+    past_week = city_daily_custom.tail(7).copy().reset_index(drop=True)
+    
+    total_week_actual = sum(past_week[f"{k}_actual_rev"].sum() for k in selected_keys if f"{k}_actual_rev" in past_week)
+    total_week_base = sum(past_week[f"{k}_baseline_rev"].sum() for k in selected_keys if f"{k}_baseline_rev" in past_week)
+    total_week_impact = total_week_actual - total_week_base
+    total_rain_week = past_week["precip_accumulation_mm"].sum()
+    
+    # 4 Equal-Span Metric Cards
+    k1, k2, k3, k4 = st.columns(4)
+    with k1:
+        badge_cls = "status-positive" if total_week_impact >= 0 else "status-negative"
+        sign_str = "+$" if total_week_impact >= 0 else "-$"
+        st.markdown(f"""
+        <div class="metric-grid-card">
+            <div class="metric-label">Weather Sales Shift</div>
+            <div class="metric-number">{sign_str}{abs(total_week_impact):,.0f}</div>
+            <div class="metric-subtext"><span class="{badge_cls}">{'Extra Gain' if total_week_impact >= 0 else 'Lost Sales'}</span> vs clear baseline</div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+    with k2:
+        st.markdown(f"""
+        <div class="metric-grid-card">
+            <div class="metric-label">Total Earned Revenue</div>
+            <div class="metric-number">${total_week_actual:,.0f}</div>
+            <div class="metric-subtext">Normal expected: ${total_week_base:,.0f}</div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+    with k3:
+        st.markdown(f"""
+        <div class="metric-grid-card">
+            <div class="metric-label">Monitored Portfolio</div>
+            <div class="metric-number">{len(selected_keys)} Units</div>
+            <div class="metric-subtext">Market: {city_names[selected_city]}</div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+    with k4:
+        st.markdown(f"""
+        <div class="metric-grid-card">
+            <div class="metric-label">Past 7-Day Rainfall</div>
+            <div class="metric-number">{total_rain_week:.1f} mm</div>
+            <div class="metric-subtext">Total rain recorded</div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+    st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
+    
+    # Modern Plotly Line Graph with Generous Spacing
+    st.markdown("#### Daily Revenue & Rainfall Timeline")
+    st.caption("Solid lines represent actual earned revenue. Dotted lines represent what sales would normally be on clear days.")
+    
+    fig_7d = make_subplots(
+        rows=2, cols=1,
+        shared_xaxes=True,
+        vertical_spacing=0.20,
+        row_heights=[0.70, 0.30],
+        subplot_titles=("Daily Revenue by Business ($ USD)", "Daily Rainfall (mm)")
+    )
+    
+    x_labels = [f"{r['day_name']}<br>{r['date_str']}" for _, r in past_week.iterrows()]
+    
+    for idx, b_key in enumerate(selected_keys):
+        if b_key not in active_catalog:
+            continue
+        cfg = active_catalog[b_key]
+        trace_color = cfg.get("color", "#38BDF8")
+        
+        cdata_actual = np.column_stack([
+            [cfg['name']] * len(past_week),
+            past_week["day_name"],
+            past_week["date_str"],
+            past_week["weather_icon"],
+            past_week["air_temp_deg_c"],
+            past_week["precip_accumulation_mm"],
+            past_week[f"{b_key}_baseline_rev"],
+            past_week[f"{b_key}_net_impact"]
+        ])
+        
+        fig_7d.add_trace(go.Scatter(
+            x=x_labels,
+            y=past_week[f"{b_key}_actual_rev"],
+            mode="lines+markers",
+            name=f"{cfg['name']} (Actual)",
+            line=dict(color="#FFFFFF", width=3.0, dash="solid"),
+            marker=dict(size=8, color="#FFFFFF", symbol=cfg.get("symbol", "circle")),
+            customdata=cdata_actual,
+            hovertemplate=(
+                "<b>%{customdata[0]}</b><br>"
+                "Date: %{customdata[1]}, %{customdata[2]}<br>"
+                "Weather: %{customdata[3]} (%{customdata[4]:.1f}°C, %{customdata[5]:.1f} mm rain)<br>"
+                "Actual Revenue: $%{y:,.0f}<br>"
+                "Normal Baseline: $%{customdata[6]:,.0f}<br>"
+                "Weather Shift: %{customdata[7]:+,.0f}<extra></extra>"
+            )
+        ), row=1, col=1)
+        
+        fig_7d.add_trace(go.Scatter(
+            x=x_labels,
+            y=past_week[f"{b_key}_baseline_rev"],
+            mode="lines",
+            name=f"{cfg['name']} (Baseline)",
+            line=dict(color="#FFFFFF", width=1.6, dash="dot"),
+            showlegend=True,
+            customdata=cdata_actual,
+            hovertemplate=(
+                "<b>%{customdata[0]} (Expected Baseline)</b><br>"
+                "Date: %{customdata[1]}, %{customdata[2]}<br>"
+                "Weather: %{customdata[3]}<br>"
+                "Expected Normal Sales: $%{y:,.0f}<extra></extra>"
+            )
+        ), row=1, col=1)
+        
+    cdata_rain = np.column_stack([
+        ["Precipitation"] * len(past_week),
+        past_week["day_name"],
+        past_week["date_str"],
+        past_week["weather_icon"],
+        past_week["air_temp_deg_c"],
+        past_week["precip_accumulation_mm"]
+    ])
+    fig_7d.add_trace(go.Scatter(
+        x=x_labels,
+        y=past_week["precip_accumulation_mm"],
+        mode="lines+markers",
+        name="Rainfall (mm)",
+        line=dict(color="#FFFFFF", width=2.0),
+        marker=dict(size=6, color="#FFFFFF", symbol="circle-open"),
+        fill="tozeroy",
+        fillcolor="rgba(255, 255, 255, 0.12)",
+        customdata=cdata_rain,
+        hovertemplate=(
+            "<b>Rainfall Volume</b><br>"
+            "Date: %{customdata[1]}, %{customdata[2]}<br>"
+            "Condition: %{customdata[3]} (%{customdata[4]:.1f}°C)<br>"
+            "Rainfall: %{y:.1f} mm<extra></extra>"
+        )
+    ), row=2, col=1)
+    
+    fig_7d.update_layout(
+        template="plotly_dark",
+        paper_bgcolor="#111827",
+        plot_bgcolor="#111827",
+        font=dict(family="Plus Jakarta Sans, sans-serif", size=11, color="#F8FAFC"),
+        margin=dict(l=15, r=15, t=75, b=15),
+        yaxis=dict(title="Revenue ($)", gridcolor="rgba(56, 189, 248, 0.10)", zeroline=False),
+        yaxis2=dict(title="Rain (mm)", gridcolor="rgba(56, 189, 248, 0.10)", zeroline=False),
+        legend=dict(orientation="h", yanchor="bottom", y=1.12, xanchor="right", x=1)
+    )
+    st.plotly_chart(fig_7d, use_container_width=True)
+    
+    st.markdown("<div style='height: 24px;'></div>", unsafe_allow_html=True)
+    
+    # Day in Review Section
+    st.markdown("### Day in Review")
+    
+    day_options = [f"{r['day_name']} ({r['date_str']}) - {r['weather_icon']}" for _, r in past_week.iterrows()]
+    selected_day_str = st.selectbox("Choose Date to Inspect:", options=day_options, index=len(day_options)-3)
+    
+    inspected_idx = day_options.index(selected_day_str)
+    day_row = past_week.iloc[inspected_idx]
+    
+    st.markdown(f"**Date:** {day_row['day_name']} ({day_row['date_str']}) &nbsp;|&nbsp; **Weather:** {day_row['weather_icon']} ({day_row['air_temp_deg_c']:.1f}°C, {day_row['precip_accumulation_mm']:.1f} mm rain)")
+    
+    num_cols = min(len(selected_keys), 3)
+    cols = st.columns(num_cols)
+    
+    for i, b_key in enumerate(selected_keys):
+        col_target = cols[i % num_cols]
+        b_insight = generate_business_specific_why_insight(b_key, day_row, custom_catalog=active_catalog)
+        badge = "status-positive" if b_insight["delta"] >= 0 else "status-negative"
+        sign_str = "+$" if b_insight["delta"] >= 0 else "-$"
+        
+        with col_target:
+            st.markdown(f"""
+            <div class="insight-box">
+                <div>
+                    <div class="insight-top">
+                        <span class="insight-title">{b_insight['name']}</span>
+                        <span class="{badge}">{sign_str}{abs(b_insight['delta']):,.0f} ({b_insight['pct_change']:+.1f}%)</span>
+                    </div>
+                    <div style="font-size: 0.82rem; color: #94A3B8; font-weight: 600;">
+                        Earned: ${b_insight['actual_rev']:,.0f} &nbsp;|&nbsp; Normal: ${b_insight['baseline_rev']:,.0f}
+                    </div>
+                    <div class="insight-content">
+                        <strong style="color: #FFFFFF;">{b_insight['headline']}</strong><br/>
+                        {"<br/>".join([f"• {b}" for b in b_insight['bullets']])}
+                    </div>
+                </div>
+                <div class="insight-bottom">
+                    Category: {b_insight.get('category', 'General')}
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+    with st.expander("Hourly Analysis"):
+        hourly_sub = engine.df[(engine.df["metro_area"] == selected_city) & (engine.df["date_str"] == day_row["date_str"])].copy()
+        hourly_clean = hourly_sub.rename(columns={
+            "timestamp_local_str": "Time",
+            "air_temp_deg_c": "Temperature (°C)",
+            "precip_accumulation_mm": "Rainfall (mm)",
+            "delivery_order_count": "Food Orders",
+            "surge_pricing_mult": "Price Surge",
+            "delivery_duration_min": "Delivery Wait Time (Mins)",
+            "bikeshare_trips_count": "Bike Trips",
+            "traffic_congestion_pct": "Traffic Jam (%)"
+        })
+        st.dataframe(
+            hourly_clean[["Time", "Temperature (°C)", "Rainfall (mm)", "Food Orders", "Price Surge", "Delivery Wait Time (Mins)", "Bike Trips", "Traffic Jam (%)"]],
+            use_container_width=True
+        )
+
+
+# ==============================================================================
+# TAB 2: HISTORICAL TRENDS & SEASONAL DISENTANGLEMENT
+# ==============================================================================
+with tab2:
+    st.subheader(f"Historical Trends & Seasonality — {city_names[selected_city]}")
+    st.markdown("Macro-level revenue timelines and econometric separation of true weather shocks from calendar trends.")
+    
+    horizon = st.selectbox("Timeline Range:", ["Last 3 Months (90 Days)", "Last 6 Months (180 Days)", "Full 2 Years (All Data)"], index=1)
+    if "3 Months" in horizon:
+        df_lt = city_daily_custom.tail(90).copy()
+    elif "6 Months" in horizon:
+        df_lt = city_daily_custom.tail(180).copy()
+    else:
+        df_lt = city_daily_custom.copy()
+        
+    df_lt["year_week"] = df_lt["date"].dt.to_period("W").astype(str)
+    
+    agg_dict = {
+        "precip_accumulation_mm": "sum",
+        "air_temp_deg_c": "mean"
+    }
+    for b_key in selected_keys:
+        if f"{b_key}_actual_rev" in df_lt:
+            agg_dict[f"{b_key}_actual_rev"] = "sum"
+            agg_dict[f"{b_key}_baseline_rev"] = "sum"
+        
+    weekly_lt = df_lt.groupby("year_week").agg(agg_dict).reset_index()
+    
+    fig_lt = make_subplots(
+        rows=2, cols=1,
+        shared_xaxes=True,
+        vertical_spacing=0.20,
+        row_heights=[0.70, 0.30],
+        subplot_titles=("Weekly Revenue Trends ($ USD)", "Weekly Rainfall Volume (mm)")
+    )
+    
+    for idx, b_key in enumerate(selected_keys):
+        if b_key not in active_catalog:
+            continue
+        cfg = active_catalog[b_key]
+        trace_color = cfg.get("color", "#38BDF8")
+        
+        cdata_lt = np.column_stack([
+            [cfg['name']] * len(weekly_lt),
+            weekly_lt["year_week"],
+            weekly_lt["air_temp_deg_c"],
+            weekly_lt["precip_accumulation_mm"],
+            weekly_lt[f"{b_key}_baseline_rev"]
+        ])
+        
+        fig_lt.add_trace(go.Scatter(
+            x=weekly_lt["year_week"],
+            y=weekly_lt[f"{b_key}_actual_rev"],
+            mode="lines+markers",
+            name=f"{cfg['name']}",
+            line=dict(color="#FFFFFF", width=3.0, dash="solid"),
+            marker=dict(size=7, color="#FFFFFF", symbol=cfg.get("symbol", "circle")),
+            customdata=cdata_lt,
+            hovertemplate=(
+                "<b>%{customdata[0]}</b><br>"
+                "Week: %{customdata[1]}<br>"
+                "Climate: %{customdata[2]:.1f}°C avg, %{customdata[3]:.1f} mm rain<br>"
+                "Weekly Earned Sales: $%{y:,.0f}<br>"
+                "Normal Baseline: $%{customdata[4]:,.0f}<extra></extra>"
+            )
+        ), row=1, col=1)
+        
+    cdata_lt_rain = np.column_stack([
+        ["Precipitation"] * len(weekly_lt),
+        weekly_lt["year_week"],
+        weekly_lt["air_temp_deg_c"],
+        weekly_lt["precip_accumulation_mm"]
+    ])
+    fig_lt.add_trace(go.Scatter(
+        x=weekly_lt["year_week"],
+        y=weekly_lt["precip_accumulation_mm"],
+        mode="lines",
+        name="Rainfall (mm)",
+        line=dict(color="#FFFFFF", width=1.8),
+        fill="tozeroy",
+        fillcolor="rgba(255, 255, 255, 0.12)",
+        customdata=cdata_lt_rain,
+        hovertemplate=(
+            "<b>Weekly Rainfall</b><br>"
+            "Week: %{customdata[1]}<br>"
+            "Total Rain: %{y:.1f} mm<extra></extra>"
+        )
+    ), row=2, col=1)
+    
+    fig_lt.update_layout(
+        template="plotly_dark",
+        paper_bgcolor="#111827",
+        plot_bgcolor="#111827",
+        font=dict(family="Plus Jakarta Sans, sans-serif", size=11, color="#F8FAFC"),
+        margin=dict(l=15, r=15, t=75, b=15),
+        yaxis=dict(title="Revenue ($)", gridcolor="rgba(56, 189, 248, 0.10)", zeroline=False),
+        yaxis2=dict(title="Rain (mm)", gridcolor="rgba(56, 189, 248, 0.10)", zeroline=False),
+        legend=dict(orientation="h", yanchor="bottom", y=1.12, xanchor="right", x=1)
+    )
+    st.plotly_chart(fig_lt, use_container_width=True)
+    
+    st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
+    
+    # Explanatory Box: Disentangling True Weather vs Seasonality
+    st.markdown("""
+    <div class="ripple-box">
+        <div class="ripple-title">Why Standard Correlations Are Misleading (True Weather vs. Seasonal Confounders)</div>
+        <div style="font-size: 0.86rem; color: #CBD5E1; line-height: 1.6; margin-top: 8px;">
+            Food delivery and retail sales naturally spike on Friday/Saturday evenings and winter holiday periods. A standard naive correlation falsely attributes normal calendar spikes to rain.
+            <br/><br/>
+            <strong>How We Fix This:</strong> We apply <strong>Two-Way Fixed Effects (TWFE) Panel Regressions</strong> with <em>Day-of-Week &times; Hour-of-Day &times; Month &times; Holiday</em> controls. This removes calendar baselines to measure true isolated weather alpha.
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    with st.expander("More Technicalities"):
+        st.markdown("This table compares simple raw correlation against true econometric impact after removing calendar bias.")
+        st.dataframe(engine.get_naive_vs_fixed_effects_comparison(), use_container_width=True)
+
+
+# ==============================================================================
+# TAB 3: BUSINESS INTERACTIONS & MULTI-HOP CHAINS
+# ==============================================================================
+with tab3:
+    st.subheader(f"Business Interactions & Domino Chains — {city_names[selected_city]}")
+    st.markdown("Quantifying higher-order multi-hop causal chains and indirect substitution flows across the commercial ecosystem.")
+    
+    # Full Multi-Hop Domino Chain Visual
+    st.markdown("""
+    <div class="domino-chain-container">
+        <div class="ripple-title" style="margin-bottom: 14px;">Higher-Order Multi-Hop Domino Chain (The Full Cascade)</div>
+        <div class="domino-step">
+            <span class="domino-num">1</span>
+            <span>Severe Rainstorm Hits Metro Area (&gt;5.0 mm/hr)</span>
+        </div>
+        <div class="domino-step">
+            <span class="domino-num">2</span>
+            <span>Micromobility Collapses (-85% Bike &amp; Scooter Trips) as commuters abandon open roads</span>
+        </div>
+        <div class="domino-step">
+            <span class="domino-num">3</span>
+            <span>Transit &amp; Rideshare Surge (+45% Passenger Requests) creating road traffic gridlock</span>
+        </div>
+        <div class="domino-step">
+            <span class="domino-num">4</span>
+            <span>Dine-In Restaurant Volume Plunges (-55%) from canceled dining reservations</span>
+        </div>
+        <div class="domino-step">
+            <span class="domino-num">5</span>
+            <span>On-Demand Food Delivery Surges (+40%) shifting meal preparation into homes</span>
+        </div>
+        <div class="domino-step">
+            <span class="domino-num">6</span>
+            <span>Power Grid HVAC &amp; Packaging Supply Shifts (Surging last-mile container demand)</span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Non-linear Tipping Point Insight
+    st.markdown("""
+    <div class="ripple-box" style="border-left: 4px solid #F59E0B;">
+        <div class="ripple-title" style="color: #FBBF24;">Non-Linear Tipping Point: Severe Storm Fracture (&gt;5 mm/hr Rain)</div>
+        <div style="font-size: 0.86rem; color: #CBD5E1; line-height: 1.6; margin-top: 6px;">
+            In light rain (1-3 mm), food delivery operates smoothly with +15% demand. However, when precipitation exceeds <strong>5 mm/hr</strong>, a non-linear tipping point occurs:
+            <br/>
+            • <strong>Customer Demand Spikes +35%</strong> (high desire to stay indoors).<br/>
+            • <strong>Courier Supply Contracts -20%</strong> (delivery drivers log off due to dangerous driving conditions).<br/>
+            • <strong>Surge Pricing Multipliers jump to 2.2x</strong>, delivery times increase by +50%, and order cancellations quadruple.
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+    st.markdown("#### Specific Substitution Interactions (Selected Portfolio)")
+    
+    sample_rain_day = city_daily_custom[city_daily_custom["precip_accumulation_mm"] > 4.0].iloc[-1] if len(city_daily_custom[city_daily_custom["precip_accumulation_mm"] > 4.0]) > 0 else city_daily_custom.iloc[-1]
+    portfolio_links = analyze_inter_business_linkages(selected_keys, sample_rain_day, custom_catalog=active_catalog)
+    
+    if portfolio_links:
+        for link in portfolio_links:
+            link_title = link.get("title", "Business Interaction")
+            link_type = link.get("type", "Ripple Effect")
+            link_summary = link.get("summary", link.get("flow", ""))
+            link_steps = link.get("chain_steps", [link.get("mechanism", "")])
+            steps_html = "".join([f'<div class="chain-step">{s}</div>' for s in link_steps if s])
+            
+            ripple_html = f'<div class="ripple-box"><div style="display: flex; justify-content: space-between; align-items: center;"><span class="ripple-title">{link_title}</span><span class="status-neutral">{link_type}</span></div><div style="font-size: 0.90rem; font-weight: 700; color: #38BDF8; margin: 6px 0 10px 0;">{link_summary}</div><div style="margin-top: 8px;">{steps_html}</div></div>'
+            st.markdown(ripple_html, unsafe_allow_html=True)
+    else:
+        st.info("Select complementary businesses (such as On-Demand Food Delivery and Dine-In Restaurant) to view specific substitution flows.")
+        
+    st.markdown("<div style='height: 16px;'></div>", unsafe_allow_html=True)
+    st.markdown("#### Past 30 Days Net Weather Sales Shift ($ USD)")
+    st.caption("Tracking how weather shifted dollar earnings above or below baseline across your businesses.")
+    
+    recent_30 = city_daily_custom.tail(30).reset_index(drop=True)
+    fig_corr = go.Figure()
+    for idx, b_key in enumerate(selected_keys):
+        if b_key not in active_catalog:
+            continue
+        cfg = active_catalog[b_key]
+        trace_color = cfg.get("color", "#38BDF8")
+        
+        cdata_30 = np.column_stack([
+            [cfg['name']] * len(recent_30),
+            recent_30["day_name"],
+            recent_30["date_str"],
+            recent_30["weather_icon"],
+            recent_30["air_temp_deg_c"],
+            recent_30["precip_accumulation_mm"]
+        ])
+        
+        fig_corr.add_trace(go.Scatter(
+            x=recent_30["date_str"],
+            y=recent_30[f"{b_key}_net_impact"],
+            mode="lines+markers",
+            name=f"{cfg['name']}",
+            line=dict(color="#FFFFFF", width=3.0, dash="solid"),
+            marker=dict(size=8, color="#FFFFFF", symbol=cfg.get("symbol", "circle")),
+            customdata=cdata_30,
+            hovertemplate=(
+                "<b>%{customdata[0]}</b><br>"
+                "Date: %{customdata[1]}, %{customdata[2]}<br>"
+                "Weather: %{customdata[3]} (%{customdata[4]:.1f}°C, %{customdata[5]:.1f} mm rain)<br>"
+                "Net Weather Shift: $%{y:+,.0f}<extra></extra>"
+            )
+        ))
+    fig_corr.update_layout(
+        template="plotly_dark",
+        paper_bgcolor="#111827",
+        plot_bgcolor="#111827",
+        font=dict(family="Plus Jakarta Sans, sans-serif", size=11, color="#F8FAFC"),
+        margin=dict(l=15, r=15, t=50, b=15),
+        yaxis=dict(title="Sales Shift ($ USD)", gridcolor="rgba(56, 189, 248, 0.10)", zeroline=True, zerolinecolor="rgba(56, 189, 248, 0.35)"),
+        legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="right", x=1)
+    )
+    st.plotly_chart(fig_corr, use_container_width=True)
+
+
+# ==============================================================================
+# TAB 4: LIVE SCENARIO SIMULATOR & AI GUIDANCE
+# ==============================================================================
+with tab4:
+    st.subheader(f"Live Scenario Simulator & Strategic AI Guidance — {city_names[selected_city]}")
+    st.markdown("Simulate 'What-If' weather shocks in real time across 6 major sectors and review prescriptive operations advice.")
+    
+    # Interactive What-If Simulation Controls
+    st.markdown("#### Interactive What-If Simulator: 'What if rain hits Manhattan on Friday at 7 PM?'")
+    
+    sim_c1, sim_c2, sim_c3, sim_c4 = st.columns(4)
+    with sim_c1:
+        sim_day = st.selectbox("Day of Week:", ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"], index=4)
+        sim_dow = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].index(sim_day)
+    with sim_c2:
+        sim_hour = st.slider("Hour of Day:", min_value=0, max_value=23, value=19, format="%d:00")
+    with sim_c3:
+        sim_rain = st.slider("Rainfall (mm/hr):", min_value=0.0, max_value=25.0, value=8.5, step=0.5)
+    with sim_c4:
+        sim_temp_anom = st.slider("Temp Anomaly vs Season (°C):", min_value=-15.0, max_value=15.0, value=-3.5, step=0.5)
+        
+    sim_output = engine.simulate_cross_sector_scenario(
+        city=selected_city,
+        day_of_week=sim_dow,
+        hour_of_day=sim_hour,
+        month=10,
+        is_holiday=0,
+        rain_mm=sim_rain,
+        snow_cm=0.0,
+        temp_anomaly_c=sim_temp_anom,
+        wind_kmh=35.0
+    )
+    
+    st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+    st.markdown(f"**Simulation Predictions across 6 Key Sectors** (Condition: {sim_day} at {sim_hour}:00 with {sim_rain} mm rain, {sim_temp_anom:+.1f}°C shock in {city_names[selected_city]}):")
+    
+    sec_cols = st.columns(3)
+    sector_names = list(sim_output["by_sector"].keys())
+    
+    for s_idx, sector_name in enumerate(sector_names):
+        target_col = sec_cols[s_idx % 3]
+        metrics_list = sim_output["by_sector"][sector_name]
+        
+        with target_col:
+            rows_html = "".join([
+                f'<div class="metric-row"><span><strong style="color:#F8FAFC;">{m["display_name"]}</strong></span><span>{m["weather_impacted"]} {m["unit"]} <span class="{"status-positive" if m["delta_pct"] >= 0 else "status-negative"}">{m["delta_pct"]:+.1f}%</span></span></div>'
+                for m in metrics_list
+            ])
+            card_html = f'<div class="sector-grid-card"><div class="sector-title">{sector_name}</div>{rows_html}</div>'
+            st.markdown(card_html, unsafe_allow_html=True)
+            
+    st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
+    
+    # 7-Day Forward Line Forecast
+    st.markdown("#### Projected 7-Day Revenue Line Forecast")
+    st.caption("Forecasted daily earnings for selected portfolio businesses under upcoming weather trajectory.")
+    
+    forecast_event = st.selectbox(
+        "Upcoming Weather Trajectory Scenario:",
+        [
+            "Heavy Mid-Week Rainstorm (Storm arriving Wed-Fri)",
+            "Winter Blizzard & Arctic Freeze (Thu-Sat)",
+            "Summer Heatwave (Highs above 38°C)",
+            "Clear & Mild Weather (Normal Conditions)"
+        ],
+        index=0
+    )
+    
+    forecast_data = generate_future_ai_forecast(selected_keys, forecast_event, custom_catalog=active_catalog)
+    
+    fig_fut = go.Figure()
+    days_x = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    
+    for idx, (b_key, p_info) in enumerate(forecast_data["projections"].items()):
+        cfg = active_catalog.get(b_key, {})
+        trace_color = cfg.get("color", "#00D2FF")
+        
+        cdata_fut = np.column_stack([
+            [p_info['name']] * len(days_x),
+            days_x,
+            p_info["baseline_series"],
+            [forecast_event.split('(')[0].strip()] * len(days_x)
+        ])
+        
+        fig_fut.add_trace(go.Scatter(
+            x=days_x,
+            y=p_info["actual_series"],
+            mode="lines+markers",
+            name=f"{p_info['name']} (Projected)",
+            line=dict(color="#FFFFFF", width=3.0, dash="solid"),
+            marker=dict(size=8, color="#FFFFFF", symbol=cfg.get("symbol", "circle")),
+            customdata=cdata_fut,
+            hovertemplate=(
+                "<b>%{customdata[0]}</b><br>"
+                "Day: %{customdata[1]} (Forward Projection)<br>"
+                "Forecast Scenario: %{customdata[3]}<br>"
+                "Projected Revenue: $%{y:,.0f}<br>"
+                "Normal Baseline: $%{customdata[2]:,.0f}<extra></extra>"
+            )
+        ))
+        fig_fut.add_trace(go.Scatter(
+            x=days_x,
+            y=p_info["baseline_series"],
+            mode="lines",
+            name=f"{p_info['name']} (Normal)",
+            line=dict(color="#FFFFFF", width=1.6, dash="dot"),
+            customdata=cdata_fut,
+            hovertemplate=(
+                "<b>%{customdata[0]} (Baseline)</b><br>"
+                "Day: %{customdata[1]}<br>"
+                "Expected Normal Sales: $%{y:,.0f}<extra></extra>"
+            )
+        ))
+        
+    fig_fut.update_layout(
+        template="plotly_dark",
+        paper_bgcolor="#111827",
+        plot_bgcolor="#111827",
+        font=dict(family="Plus Jakarta Sans, sans-serif", size=11, color="#F8FAFC"),
+        margin=dict(l=15, r=15, t=50, b=15),
+        yaxis=dict(title="Projected Daily Sales ($)", gridcolor="rgba(56, 189, 248, 0.10)", zeroline=False),
+        legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="right", x=1)
+    )
+    st.plotly_chart(fig_fut, use_container_width=True)
+    
+    st.markdown("<div style='height: 16px;'></div>", unsafe_allow_html=True)
+    st.markdown("#### Strategic Operational Guidance")
+    for advice in forecast_data["ai_advice"]:
+        st.markdown(f"""
+        <div class="ai-guidance-card">
+            {advice}
+        </div>
+        """, unsafe_allow_html=True)
+
+
+# ==============================================================================
+# TAB 5: MULTI-SOURCE DATA WRANGLING DIAGNOSTICS
+# ==============================================================================
+with tab5:
+    st.subheader(f"Multi-Source Data Wrangling Diagnostics — Pipeline Telemetry")
+    st.markdown("Demonstrating real-world data engineering rigor: Asynchronous alignment of meteorological sensor feeds with transactional POS databases.")
+    
+    p1, p2, p3 = st.columns(3)
+    with p1:
+        st.markdown("""
+        <div class="sector-grid-card">
+            <div class="sector-title">1. Timezone & Spatial Ingestion</div>
+            <div style="font-size: 0.85rem; color: #CBD5E1; line-height: 1.5;">
+                • Harmonized <strong>4 distinct IANA timezones</strong> (America/New_York, America/Chicago, America/Los_Angeles, America/Phoenix).<br/>
+                • Handled Daylight Saving Time (DST) fold transitions safely without dropped hours.<br/>
+                • Standardized all timestamps into unified UTC spatial-temporal index.
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+    with p2:
+        st.markdown("""
+        <div class="sector-grid-card">
+            <div class="sector-title">2. Asynchronous Fusion & Resampling</div>
+            <div style="font-size: 0.85rem; color: #CBD5E1; line-height: 1.5;">
+                • Merged <strong>69,106 hourly meteorological records</strong> with <strong>279,249 sub-hourly 15-minute POS records</strong>.<br/>
+                • Applied cubic spline interpolation and forward-fill windowing for missing sensor dropouts.<br/>
+                • Volume-weighted temporal resampling to unified hourly analysis grain.
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+    with p3:
+        st.markdown("""
+        <div class="sector-grid-card">
+            <div class="sector-title">3. Feature Engineering & Baselines</div>
+            <div style="font-size: 0.85rem; color: #CBD5E1; line-height: 1.5;">
+                • Calculated <strong>Temperature Anomaly Shocks</strong> (Actual Temp − 30-day Rolling Seasonal Mean).<br/>
+                • Computed Cooling/Heating Degree Days (CDD/HDD).<br/>
+                • Constructed 21 multi-sector operational target metrics across 4 climatic regions.
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+    st.markdown("<div style='height: 15px;'></div>", unsafe_allow_html=True)
+    st.markdown("#### Live Pipeline Feed Inspector")
+    st.caption("Displaying synchronized merged records across weather telemetry and multi-sector operational streams.")
+    
+    display_df = engine.df[engine.df["metro_area"] == selected_city].tail(25).copy()
+    st.dataframe(
+        display_df[[
+            "timestamp_local_str", "metro_area", "air_temp_deg_c", "temp_anomaly_deg_c",
+            "precip_accumulation_mm", "delivery_order_count", "surge_pricing_mult",
+            "bikeshare_trips_count", "rideshare_trip_count", "restaurant_dinein_guests",
+            "retail_mall_footfall", "electricity_grid_load_mw", "freight_delay_min"
+        ]],
+        use_container_width=True
+    )
