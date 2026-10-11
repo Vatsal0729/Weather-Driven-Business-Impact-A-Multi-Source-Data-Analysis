@@ -20,6 +20,7 @@ import numpy as np
 import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
+import html
 from plotly.subplots import make_subplots
 
 from src.econometrics import WeatherEconometricsEngine
@@ -439,6 +440,113 @@ st.markdown("""
         margin-bottom: 7px;
         font-size: 0.85rem;
         color: #CBD5E1;
+    }
+    
+    /* Business Domino Impact Cards */
+    .biz-domino-card {
+        background: linear-gradient(180deg, #161F30 0%, #111827 100%);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 10px;
+        padding: 20px 22px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+        transition: transform 0.15s ease, border-color 0.15s ease;
+    }
+    
+    .biz-domino-card:hover {
+        border-color: rgba(56, 189, 248, 0.35);
+        transform: translateY(-2px);
+    }
+    
+    .biz-domino-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 12px;
+        margin-bottom: 12px;
+    }
+    
+    .biz-domino-title {
+        font-size: 1.02rem;
+        font-weight: 800;
+        color: #FFFFFF;
+        letter-spacing: -0.02em;
+        line-height: 1.3;
+        margin-bottom: 3px;
+    }
+    
+    .biz-domino-category {
+        font-size: 0.74rem;
+        color: #94A3B8;
+        text-transform: uppercase;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+    }
+    
+    .biz-domino-badge {
+        white-space: nowrap;
+        font-size: 0.82rem;
+        font-weight: 700;
+        padding: 4px 10px;
+        border-radius: 6px;
+        letter-spacing: 0.02em;
+    }
+    
+    .biz-domino-summary {
+        background: rgba(56, 189, 248, 0.07);
+        border: 1px solid rgba(56, 189, 248, 0.22);
+        border-radius: 6px;
+        padding: 10px 14px;
+        font-size: 0.85rem;
+        color: #38BDF8;
+        font-weight: 600;
+        line-height: 1.45;
+        margin-bottom: 12px;
+    }
+    
+    .biz-chain-step {
+        background-color: #0F172A;
+        border-left: 3px solid #38BDF8;
+        border-radius: 0 6px 6px 0;
+        padding: 9px 14px;
+        margin-bottom: 8px;
+        font-size: 0.84rem;
+        color: #CBD5E1;
+        line-height: 1.45;
+    }
+    
+    .biz-chain-step strong {
+        color: #F8FAFC;
+    }
+    
+    .biz-downstream-box {
+        background-color: #0B1120;
+        border-left: 3px solid #38BDF8;
+        padding: 10px 14px;
+        border-radius: 0 6px 6px 0;
+        margin-top: 10px;
+        font-size: 0.83rem;
+        color: #CBD5E1;
+        line-height: 1.5;
+    }
+    
+    .biz-downstream-box strong {
+        color: #38BDF8;
+    }
+    
+    .biz-countermeasure-box {
+        background-color: #0B1120;
+        border-left: 3px solid #00E676;
+        padding: 10px 14px;
+        border-radius: 0 6px 6px 0;
+        margin-top: 8px;
+        font-size: 0.83rem;
+        color: #CBD5E1;
+        line-height: 1.5;
+    }
+    
+    .biz-countermeasure-box strong {
+        color: #00E676;
     }
     
     /* Sector Scenario Cards */
@@ -1236,32 +1344,32 @@ with tab3:
     dynamic_cascade = generate_dynamic_domino_cascade(selected_city, cur_w, selected_keys, custom_catalog=active_catalog)
     
     steps_domino_html = "".join([
-        f'<div class="domino-step"><span class="domino-num">{s["num"]}</span><span>{s["text"]}</span></div>'
+        f'<div class="domino-step"><span class="domino-num">{s["num"]}</span><span>{html.escape(str(s["text"]))}</span></div>'
         for s in dynamic_cascade["steps"]
     ])
-    st.markdown(f"""
-    <div class="domino-chain-container">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
-            <div class="ripple-title" style="margin-bottom: 0;">Multi-Hop Domino Chain — {dynamic_cascade['city_name']} ({dynamic_cascade['regime']})</div>
-        </div>
-        {steps_domino_html}
-    </div>
-    """, unsafe_allow_html=True)
+    chain_html = (
+        f'<div class="domino-chain-container">'
+        f'<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">'
+        f'<div class="ripple-title" style="margin-bottom: 0;">Multi-Hop Domino Chain — {html.escape(str(dynamic_cascade["city_name"]))} ({html.escape(str(dynamic_cascade["regime"]))})</div>'
+        f'</div>'
+        f'{steps_domino_html}'
+        f'</div>'
+    )
+    st.markdown(chain_html, unsafe_allow_html=True)
     
     # 2. Non-linear Tipping Point Insight (Dynamic Thresholds)
     tp = dynamic_cascade["tipping_point"]
-    st.markdown(f"""
-    <div class="ripple-box" style="border-left: 4px solid #F59E0B; margin-bottom: 22px;">
-        <div class="ripple-title" style="color: #FBBF24;">{tp['title']}</div>
-        <div style="font-size: 0.86rem; color: #CBD5E1; line-height: 1.6; margin-top: 8px;">
-            When weather conditions cross historical operational tolerance thresholds in <strong>{dynamic_cascade['city_name']}</strong>, economic channels fracture non-linearly:
-            <br/>
-            • <strong>Customer Demand Impact:</strong> {tp['demand']}<br/>
-            • <strong>Service &amp; Courier Supply:</strong> {tp['supply']}<br/>
-            • <strong>Operational Outcome:</strong> {tp['consequence']}
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    tipping_html = (
+        f'<div class="ripple-box" style="border-left: 4px solid #F59E0B; margin-bottom: 22px;">'
+        f'<div class="ripple-title" style="color: #FBBF24;">{html.escape(str(tp["title"]))}</div>'
+        f'<div style="font-size: 0.86rem; color: #CBD5E1; line-height: 1.6; margin-top: 8px;">'
+        f'When weather conditions cross historical operational tolerance thresholds in <strong>{html.escape(str(dynamic_cascade["city_name"]))}</strong>, economic channels fracture non-linearly:<br/>'
+        f'• <strong>Customer Demand Impact:</strong> {html.escape(str(tp["demand"]))}<br/>'
+        f'• <strong>Service &amp; Courier Supply:</strong> {html.escape(str(tp["supply"]))}<br/>'
+        f'• <strong>Operational Outcome:</strong> {html.escape(str(tp["consequence"]))}'
+        f'</div></div>'
+    )
+    st.markdown(tipping_html, unsafe_allow_html=True)
     
     # 3. Unique Domino Effect & Impact for Every Business in Active Portfolio
     st.markdown("#### Unique Business Domino Effects & Impact Analysis")
@@ -1276,41 +1384,46 @@ with tab3:
         target_c = biz_cols[idx % num_biz_cols]
         badge_cls = "status-positive" if b_info["delta"] >= 0 else "status-negative"
         sign_str = "+$" if b_info["delta"] >= 0 else "-$"
+        delta_str = f"{sign_str}{abs(b_info['delta']):,.0f} ({b_info['pct']:+.1f}%)"
+        
+        name_esc = html.escape(str(b_info.get("name", "Business")))
+        cat_esc = html.escape(str(b_info.get("category", "Commercial Enterprise")))
+        trig_esc = html.escape(str(b_info.get("trigger", "")))
+        beh_esc = html.escape(str(b_info.get("behavior", "")))
+        fin_esc = html.escape(str(b_info.get("financial", "")))
+        down_esc = html.escape(str(b_info.get("downstream", "")))
+        act_esc = html.escape(str(b_info.get("action", "")))
+        
+        card_html = (
+            f'<div class="biz-domino-card">'
+            f'<div class="biz-domino-header">'
+            f'<div>'
+            f'<div class="biz-domino-title">{name_esc}</div>'
+            f'<div class="biz-domino-category">{cat_esc}</div>'
+            f'</div>'
+            f'<span class="biz-domino-badge {badge_cls}">{delta_str}</span>'
+            f'</div>'
+            f'<div class="biz-domino-summary">'
+            f'<strong>Weather Impact Summary:</strong> {trig_esc}'
+            f'</div>'
+            f'<div class="biz-chain-step"><strong>1. Weather Trigger:</strong> {trig_esc}</div>'
+            f'<div class="biz-chain-step"><strong>2. Consumer Reaction:</strong> {beh_esc}</div>'
+            f'<div class="biz-chain-step"><strong>3. Financial Effect:</strong> {fin_esc}</div>'
+            f'<div class="biz-downstream-box">'
+            f'<strong>Downstream Effects:</strong> {down_esc}'
+            f'</div>'
+            f'<div class="biz-countermeasure-box">'
+            f'<strong>Operational Countermeasure:</strong> {act_esc}'
+            f'</div>'
+            f'</div>'
+        )
         
         with target_c:
-            st.markdown(f"""
-            <div class="ripple-box" style="margin-bottom: 16px;">
-                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                    <div>
-                        <div class="ripple-title" style="margin-bottom: 2px;">{b_info['name']}</div>
-                        <div style="font-size: 0.76rem; color: #94A3B8; text-transform: uppercase; font-weight: 700;">{b_info['category']}</div>
-                    </div>
-                    <span class="{badge_cls}" style="font-size: 0.82rem;">{sign_str}{abs(b_info['delta']):,.0f} ({b_info['pct']:+.1f}%)</span>
-                </div>
-                
-                <div style="font-size: 0.84rem; color: #38BDF8; font-weight: 600; margin: 10px 0 8px 0; line-height: 1.4;">
-                    {b_info['trigger']}
-                </div>
-                
-                <div style="margin-top: 8px;">
-                    <div class="chain-step"><strong>1. Weather Trigger:</strong> {b_info['trigger']}</div>
-                    <div class="chain-step"><strong>2. Consumer Reaction:</strong> {b_info['behavior']}</div>
-                    <div class="chain-step"><strong>3. Financial Effect:</strong> {b_info['financial']}</div>
-                </div>
-                
-                <div style="background-color: #0B1120; border-left: 3px solid #38BDF8; padding: 8px 12px; border-radius: 4px; margin-top: 10px; font-size: 0.82rem; color: #E2E8F0; line-height: 1.5;">
-                    <strong style="color: #38BDF8;">Downstream Domino Propagation:</strong> {b_info['downstream']}
-                </div>
-                
-                <div style="background-color: #0B1120; border-left: 3px solid #00E676; padding: 8px 12px; border-radius: 4px; margin-top: 6px; font-size: 0.82rem; color: #E2E8F0; line-height: 1.5;">
-                    <strong style="color: #00E676;">Operational Countermeasure:</strong> {b_info['action']}
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
+            st.markdown(card_html, unsafe_allow_html=True)
             
     st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
-    st.markdown("#### Cross-Business Channel Substitution Flows")
-    st.caption("How lost demand in physically exposed businesses migrates directly into indoor or digital channels.")
+    st.markdown("#### Cross-Channel Demand Shifts")
+    st.caption("How weather-driven demand moves between in-person, indoor and digital businesses.")
     
     sample_rain_day = city_daily_custom[city_daily_custom["precip_accumulation_mm"] > 2.0].iloc[-1] if len(city_daily_custom[city_daily_custom["precip_accumulation_mm"] > 2.0]) > 0 else city_daily_custom.iloc[-1]
     portfolio_links = analyze_inter_business_linkages(selected_keys, sample_rain_day, custom_catalog=active_catalog)
