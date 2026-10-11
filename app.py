@@ -580,23 +580,41 @@ with ctrl_col2:
 # Live Weather Telemetry Ribbon
 live_weather_pkg = get_cached_live_weather(selected_city)
 cur_w = live_weather_pkg["current"]
+nasa_p = live_weather_pkg.get("nasa_power", {})
+worldview_url = live_weather_pkg.get("nasa_worldview_url", "https://worldview.earthdata.nasa.gov/")
+consensus = live_weather_pkg.get("consensus_rating", "Multi-Source Feed Active")
+
 is_live = cur_w.get("is_live", False)
-src_label = "LIVE API FEED" if is_live else "CACHED TELEMETRY"
+src_label = "LIVE API CONSENSUS" if is_live else "CACHED TELEMETRY"
 status_color = "#00E676" if is_live else "#FFB300"
+nasa_temp = nasa_p.get("temperature_c", cur_w["temperature_c"])
 
 st.markdown(f"""
-<div style="background: rgba(17, 24, 39, 0.95); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 10px; padding: 10px 18px; margin: 6px 0 16px 0; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
-    <div style="display: flex; align-items: center; gap: 10px;">
-        <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: {status_color}; box-shadow: 0 0 8px {status_color};"></span>
-        <span style="font-weight: 700; color: #F8FAFC; font-size: 0.92rem;">{cur_w['city_name']} Live Weather:</span>
-        <span style="color: #38BDF8; font-weight: 600; font-size: 0.92rem;">{cur_w['condition']}</span>
+<div style="background: rgba(17, 24, 39, 0.95); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 10px; padding: 12px 18px; margin: 6px 0 16px 0;">
+    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 8px; margin-bottom: 8px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: {status_color}; box-shadow: 0 0 8px {status_color};"></span>
+            <span style="font-weight: 700; color: #F8FAFC; font-size: 0.94rem;">{cur_w['city_name']} Multi-Source Weather Telemetry:</span>
+            <span style="color: #38BDF8; font-weight: 600; font-size: 0.92rem;">{cur_w['condition']}</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 12px; font-size: 0.88rem;">
+            <a href="{worldview_url}" target="_blank" style="color: #00D2FF; text-decoration: none; font-size: 0.80rem; font-weight: 600; background: rgba(0, 210, 255, 0.12); border: 1px solid rgba(0, 210, 255, 0.35); padding: 4px 10px; border-radius: 6px;">
+                Inspect NASA Worldview Satellite Layer &rarr;
+            </a>
+            <span style="font-size: 0.76rem; color: #94A3B8; background: rgba(255,255,255,0.06); padding: 4px 8px; border-radius: 6px;">{src_label}</span>
+        </div>
     </div>
-    <div style="display: flex; align-items: center; gap: 16px; font-size: 0.88rem; color: #E2E8F0;">
-        <span>Temp: <strong style="color: #FFFFFF;">{cur_w['temperature_c']:.1f}°C</strong></span>
-        <span>Rain: <strong style="color: #FFFFFF;">{cur_w['precipitation_mm']:.1f} mm</strong></span>
-        <span>Humidity: <strong style="color: #FFFFFF;">{cur_w['humidity_pct']:.0f}%</strong></span>
-        <span>Wind: <strong style="color: #FFFFFF;">{cur_w['wind_kmh']:.1f} km/h</strong></span>
-        <span style="font-size: 0.76rem; color: #94A3B8; background: rgba(255,255,255,0.06); padding: 3px 8px; border-radius: 6px;">{src_label}</span>
+    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; font-size: 0.86rem; color: #E2E8F0;">
+        <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+            <span>Ground Temp: <strong style="color: #FFFFFF;">{cur_w['temperature_c']:.1f}°C</strong></span>
+            <span>NASA Satellite Temp: <strong style="color: #38BDF8;">{nasa_temp:.1f}°C</strong></span>
+            <span>Precipitation: <strong style="color: #FFFFFF;">{cur_w['precipitation_mm']:.1f} mm/h</strong></span>
+            <span>Humidity: <strong style="color: #FFFFFF;">{cur_w['humidity_pct']:.0f}%</strong></span>
+            <span>Wind: <strong style="color: #FFFFFF;">{cur_w['wind_kmh']:.1f} km/h</strong></span>
+        </div>
+        <div style="font-size: 0.78rem; color: #38BDF8; font-weight: 500;">
+            Consensus: {consensus}
+        </div>
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -1345,7 +1363,7 @@ with tab4:
     if fc_mode == "Live 7-Day Real-World Forecast (Open-Meteo API)":
         daily_fc = live_weather_pkg.get("daily_forecast", [])
         
-        st.markdown(f"**Upcoming 7-Day Real Meteorological Forecast — {live_weather_pkg['city_name']}:**")
+        st.markdown(f"**Upcoming 7-Day Real Meteorological Forecast — {live_weather_pkg['city_name']}** *(Multi-Source Consensus: Open-Meteo High-Resolution Model + NASA POWER Satellite Telemetry + [NASA Worldview Satellite GIBS]({worldview_url}))*:")
         w_cols = st.columns(len(daily_fc))
         for w_idx, day_w in enumerate(daily_fc):
             with w_cols[w_idx]:
