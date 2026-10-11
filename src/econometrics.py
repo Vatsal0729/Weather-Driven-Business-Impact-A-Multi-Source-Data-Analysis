@@ -139,7 +139,10 @@ class WeatherEconometricsEngine:
                 "Prediction Accuracy": f"{int(stats['r_squared']*100)}%",
                 "Reliable Effect": "Yes" if stats["rain_pvalue"] < 0.01 else "No"
             })
-        return pd.DataFrame(records)
+        df_out = pd.DataFrame(records)
+        df_out.index = range(1, len(df_out) + 1)
+        df_out.index.name = "#"
+        return df_out
 
     def simulate_cross_sector_scenario(
         self,

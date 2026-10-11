@@ -29,6 +29,8 @@ from src.revenue_analytics import (
     calculate_custom_business_daily_series,
     generate_business_specific_why_insight,
     analyze_inter_business_linkages,
+    generate_dynamic_domino_cascade,
+    generate_business_specific_domino_effects,
     generate_future_ai_forecast,
     aggregate_daily_financials
 )
@@ -925,15 +927,25 @@ with tab1:
         )
     ), row=2, col=1)
     
+    fig_7d.for_each_annotation(lambda a: a.update(font=dict(size=12, color="#E2E8F0")))
     fig_7d.update_layout(
         template="plotly_dark",
         paper_bgcolor="#111827",
         plot_bgcolor="#111827",
         font=dict(family="Plus Jakarta Sans, sans-serif", size=11, color="#F8FAFC"),
-        margin=dict(l=15, r=15, t=75, b=15),
+        margin=dict(l=15, r=15, t=40, b=75),
         yaxis=dict(title="Revenue ($)", gridcolor="rgba(56, 189, 248, 0.10)", zeroline=False),
         yaxis2=dict(title="Rain (mm)", gridcolor="rgba(56, 189, 248, 0.10)", zeroline=False),
-        legend=dict(orientation="h", yanchor="bottom", y=1.12, xanchor="right", x=1)
+        legend=dict(
+            orientation="h",
+            yanchor="top",
+            y=-0.22,
+            xanchor="center",
+            x=0.5,
+            bgcolor="rgba(17, 24, 39, 0.7)",
+            bordercolor="rgba(255, 255, 255, 0.1)",
+            borderwidth=1
+        )
     )
     st.plotly_chart(fig_7d, use_container_width=True)
     
@@ -993,6 +1005,9 @@ with tab1:
             "bikeshare_trips_count": "Bike Trips",
             "traffic_congestion_pct": "Traffic Jam (%)"
         })
+        hourly_clean = hourly_clean.reset_index(drop=True)
+        hourly_clean.index = range(1, len(hourly_clean) + 1)
+        hourly_clean.index.name = "#"
         st.dataframe(
             hourly_clean[["Time", "Temperature (°C)", "Rainfall (mm)", "Food Orders", "Price Surge", "Delivery Wait Time (Mins)", "Bike Trips", "Traffic Jam (%)"]],
             use_container_width=True
@@ -1088,15 +1103,25 @@ with tab2:
         )
     ), row=2, col=1)
     
+    fig_lt.for_each_annotation(lambda a: a.update(font=dict(size=12, color="#E2E8F0")))
     fig_lt.update_layout(
         template="plotly_dark",
         paper_bgcolor="#111827",
         plot_bgcolor="#111827",
         font=dict(family="Plus Jakarta Sans, sans-serif", size=11, color="#F8FAFC"),
-        margin=dict(l=15, r=15, t=75, b=15),
+        margin=dict(l=15, r=15, t=40, b=75),
         yaxis=dict(title="Revenue ($)", gridcolor="rgba(56, 189, 248, 0.10)", zeroline=False),
         yaxis2=dict(title="Rain (mm)", gridcolor="rgba(56, 189, 248, 0.10)", zeroline=False),
-        legend=dict(orientation="h", yanchor="bottom", y=1.12, xanchor="right", x=1)
+        legend=dict(
+            orientation="h",
+            yanchor="top",
+            y=-0.22,
+            xanchor="center",
+            x=0.5,
+            bgcolor="rgba(17, 24, 39, 0.7)",
+            bordercolor="rgba(255, 255, 255, 0.1)",
+            borderwidth=1
+        )
     )
     st.plotly_chart(fig_lt, use_container_width=True)
     
@@ -1114,9 +1139,12 @@ with tab2:
     </div>
     """, unsafe_allow_html=True)
     
-    with st.expander("More Technicalities"):
-        st.markdown("This table compares simple raw correlation against true econometric impact after removing calendar bias.")
-        st.dataframe(engine.get_naive_vs_fixed_effects_comparison(), use_container_width=True)
+    with st.expander("More Technicalities — Historical Econometric Comparison Table"):
+        st.markdown("This table compares simple raw correlation against true econometric impact after removing calendar bias (indexed 1 through N).")
+        comp_df = engine.get_naive_vs_fixed_effects_comparison()
+        comp_df.index = range(1, len(comp_df) + 1)
+        comp_df.index.name = "#"
+        st.dataframe(comp_df, use_container_width=True)
 
 
 # ==============================================================================
@@ -1126,55 +1154,88 @@ with tab3:
     st.subheader(f"Business Interactions & Domino Chains — {city_names[selected_city]}")
     st.markdown("Quantifying higher-order multi-hop causal chains and indirect substitution flows across the commercial ecosystem.")
     
-    # Full Multi-Hop Domino Chain Visual
-    st.markdown("""
+    # 1. Full Multi-Hop Domino Chain (Dynamic for City & Current Weather)
+    dynamic_cascade = generate_dynamic_domino_cascade(selected_city, cur_w, selected_keys, custom_catalog=active_catalog)
+    
+    steps_domino_html = "".join([
+        f'<div class="domino-step"><span class="domino-num">{s["num"]}</span><span>{s["text"]}</span></div>'
+        for s in dynamic_cascade["steps"]
+    ])
+    st.markdown(f"""
     <div class="domino-chain-container">
-        <div class="ripple-title" style="margin-bottom: 14px;">Higher-Order Multi-Hop Domino Chain (The Full Cascade)</div>
-        <div class="domino-step">
-            <span class="domino-num">1</span>
-            <span>Severe Rainstorm Hits Metro Area (&gt;5.0 mm/hr)</span>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+            <div class="ripple-title" style="margin-bottom: 0;">Multi-Hop Domino Chain — {dynamic_cascade['city_name']} ({dynamic_cascade['regime']})</div>
+            <span class="status-neutral" style="font-size: 0.76rem;">{dynamic_cascade['weather_summary']}</span>
         </div>
-        <div class="domino-step">
-            <span class="domino-num">2</span>
-            <span>Micromobility Collapses (-85% Bike &amp; Scooter Trips) as commuters abandon open roads</span>
-        </div>
-        <div class="domino-step">
-            <span class="domino-num">3</span>
-            <span>Transit &amp; Rideshare Surge (+45% Passenger Requests) creating road traffic gridlock</span>
-        </div>
-        <div class="domino-step">
-            <span class="domino-num">4</span>
-            <span>Dine-In Restaurant Volume Plunges (-55%) from canceled dining reservations</span>
-        </div>
-        <div class="domino-step">
-            <span class="domino-num">5</span>
-            <span>On-Demand Food Delivery Surges (+40%) shifting meal preparation into homes</span>
-        </div>
-        <div class="domino-step">
-            <span class="domino-num">6</span>
-            <span>Power Grid HVAC &amp; Packaging Supply Shifts (Surging last-mile container demand)</span>
-        </div>
+        {steps_domino_html}
     </div>
     """, unsafe_allow_html=True)
     
-    # Non-linear Tipping Point Insight
-    st.markdown("""
-    <div class="ripple-box" style="border-left: 4px solid #F59E0B;">
-        <div class="ripple-title" style="color: #FBBF24;">Non-Linear Tipping Point: Severe Storm Fracture (&gt;5 mm/hr Rain)</div>
-        <div style="font-size: 0.86rem; color: #CBD5E1; line-height: 1.6; margin-top: 6px;">
-            In light rain (1-3 mm), food delivery operates smoothly with +15% demand. However, when precipitation exceeds <strong>5 mm/hr</strong>, a non-linear tipping point occurs:
+    # 2. Non-linear Tipping Point Insight (Dynamic Thresholds)
+    tp = dynamic_cascade["tipping_point"]
+    st.markdown(f"""
+    <div class="ripple-box" style="border-left: 4px solid #F59E0B; margin-bottom: 22px;">
+        <div class="ripple-title" style="color: #FBBF24;">{tp['title']}</div>
+        <div style="font-size: 0.86rem; color: #CBD5E1; line-height: 1.6; margin-top: 8px;">
+            When weather conditions cross historical operational tolerance thresholds in <strong>{dynamic_cascade['city_name']}</strong>, economic channels fracture non-linearly:
             <br/>
-            • <strong>Customer Demand Spikes +35%</strong> (high desire to stay indoors).<br/>
-            • <strong>Courier Supply Contracts -20%</strong> (delivery drivers log off due to dangerous driving conditions).<br/>
-            • <strong>Surge Pricing Multipliers jump to 2.2x</strong>, delivery times increase by +50%, and order cancellations quadruple.
+            • <strong>Customer Demand Impact:</strong> {tp['demand']}<br/>
+            • <strong>Service &amp; Courier Supply:</strong> {tp['supply']}<br/>
+            • <strong>Operational Outcome:</strong> {tp['consequence']}
         </div>
     </div>
     """, unsafe_allow_html=True)
     
-    st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
-    st.markdown("#### Specific Substitution Interactions (Selected Portfolio)")
+    # 3. Unique Domino Effect & Impact for Every Business in Active Portfolio
+    st.markdown("#### Unique Business Domino Effects & Impact Analysis")
+    st.caption(f"Granular causal chains and operational ripple effects customized for each selected business under current {city_names[selected_city]} weather.")
     
-    sample_rain_day = city_daily_custom[city_daily_custom["precip_accumulation_mm"] > 4.0].iloc[-1] if len(city_daily_custom[city_daily_custom["precip_accumulation_mm"] > 4.0]) > 0 else city_daily_custom.iloc[-1]
+    biz_dominos = generate_business_specific_domino_effects(selected_city, cur_w, selected_keys, custom_catalog=active_catalog)
+    
+    num_biz_cols = min(len(biz_dominos), 2) if len(biz_dominos) > 1 else 1
+    biz_cols = st.columns(num_biz_cols)
+    
+    for idx, b_info in enumerate(biz_dominos):
+        target_c = biz_cols[idx % num_biz_cols]
+        badge_cls = "status-positive" if b_info["delta"] >= 0 else "status-negative"
+        sign_str = "+$" if b_info["delta"] >= 0 else "-$"
+        
+        with target_c:
+            st.markdown(f"""
+            <div class="ripple-box" style="margin-bottom: 16px;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <div>
+                        <div class="ripple-title" style="margin-bottom: 2px;">{b_info['name']}</div>
+                        <div style="font-size: 0.76rem; color: #94A3B8; text-transform: uppercase; font-weight: 700;">{b_info['category']}</div>
+                    </div>
+                    <span class="{badge_cls}" style="font-size: 0.82rem;">{sign_str}{abs(b_info['delta']):,.0f} ({b_info['pct']:+.1f}%)</span>
+                </div>
+                
+                <div style="font-size: 0.84rem; color: #38BDF8; font-weight: 600; margin: 10px 0 8px 0; line-height: 1.4;">
+                    {b_info['trigger']}
+                </div>
+                
+                <div style="margin-top: 8px;">
+                    <div class="chain-step"><strong>1. Weather Trigger:</strong> {b_info['trigger']}</div>
+                    <div class="chain-step"><strong>2. Consumer Reaction:</strong> {b_info['behavior']}</div>
+                    <div class="chain-step"><strong>3. Financial Effect:</strong> {b_info['financial']}</div>
+                </div>
+                
+                <div style="background-color: #0B1120; border-left: 3px solid #38BDF8; padding: 8px 12px; border-radius: 4px; margin-top: 10px; font-size: 0.82rem; color: #E2E8F0; line-height: 1.5;">
+                    <strong style="color: #38BDF8;">Downstream Domino Propagation:</strong> {b_info['downstream']}
+                </div>
+                
+                <div style="background-color: #0B1120; border-left: 3px solid #00E676; padding: 8px 12px; border-radius: 4px; margin-top: 6px; font-size: 0.82rem; color: #E2E8F0; line-height: 1.5;">
+                    <strong style="color: #00E676;">Operational Countermeasure:</strong> {b_info['action']}
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+    st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+    st.markdown("#### Cross-Business Channel Substitution Flows")
+    st.caption("How lost demand in physically exposed businesses migrates directly into indoor or digital channels.")
+    
+    sample_rain_day = city_daily_custom[city_daily_custom["precip_accumulation_mm"] > 2.0].iloc[-1] if len(city_daily_custom[city_daily_custom["precip_accumulation_mm"] > 2.0]) > 0 else city_daily_custom.iloc[-1]
     portfolio_links = analyze_inter_business_linkages(selected_keys, sample_rain_day, custom_catalog=active_catalog)
     
     if portfolio_links:
@@ -1188,7 +1249,7 @@ with tab3:
             ripple_html = f'<div class="ripple-box"><div style="display: flex; justify-content: space-between; align-items: center;"><span class="ripple-title">{link_title}</span><span class="status-neutral">{link_type}</span></div><div style="font-size: 0.90rem; font-weight: 700; color: #38BDF8; margin: 6px 0 10px 0;">{link_summary}</div><div style="margin-top: 8px;">{steps_html}</div></div>'
             st.markdown(ripple_html, unsafe_allow_html=True)
     else:
-        st.info("Select complementary businesses (such as On-Demand Food Delivery and Dine-In Restaurant) to view specific substitution flows.")
+        st.info("Select complementary businesses (such as Square POS and Stripe, or Dine-In Restaurant and Food Delivery) to view substitution flows.")
         
     st.markdown("<div style='height: 16px;'></div>", unsafe_allow_html=True)
     st.markdown("#### Past 30 Days Net Weather Sales Shift ($ USD)")
@@ -1231,9 +1292,18 @@ with tab3:
         paper_bgcolor="#111827",
         plot_bgcolor="#111827",
         font=dict(family="Plus Jakarta Sans, sans-serif", size=11, color="#F8FAFC"),
-        margin=dict(l=15, r=15, t=50, b=15),
+        margin=dict(l=15, r=15, t=30, b=75),
         yaxis=dict(title="Sales Shift ($ USD)", gridcolor="rgba(56, 189, 248, 0.10)", zeroline=True, zerolinecolor="rgba(56, 189, 248, 0.35)"),
-        legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="right", x=1)
+        legend=dict(
+            orientation="h",
+            yanchor="top",
+            y=-0.22,
+            xanchor="center",
+            x=0.5,
+            bgcolor="rgba(17, 24, 39, 0.7)",
+            bordercolor="rgba(255, 255, 255, 0.1)",
+            borderwidth=1
+        )
     )
     st.plotly_chart(fig_corr, use_container_width=True)
 
@@ -1417,9 +1487,18 @@ with tab4:
         paper_bgcolor="#111827",
         plot_bgcolor="#111827",
         font=dict(family="Plus Jakarta Sans, sans-serif", size=11, color="#F8FAFC"),
-        margin=dict(l=15, r=15, t=50, b=15),
+        margin=dict(l=15, r=15, t=30, b=75),
         yaxis=dict(title="Projected Daily Sales ($)", gridcolor="rgba(56, 189, 248, 0.10)", zeroline=False),
-        legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="right", x=1)
+        legend=dict(
+            orientation="h",
+            yanchor="top",
+            y=-0.22,
+            xanchor="center",
+            x=0.5,
+            bgcolor="rgba(17, 24, 39, 0.7)",
+            bordercolor="rgba(255, 255, 255, 0.1)",
+            borderwidth=1
+        )
     )
     st.plotly_chart(fig_fut, use_container_width=True)
     
@@ -1482,6 +1561,9 @@ with tab5:
     st.caption("Displaying synchronized merged records across weather telemetry and multi-sector operational streams.")
     
     display_df = engine.df[engine.df["metro_area"] == selected_city].tail(25).copy()
+    display_df = display_df.reset_index(drop=True)
+    display_df.index = range(1, len(display_df) + 1)
+    display_df.index.name = "#"
     st.dataframe(
         display_df[[
             "timestamp_local_str", "metro_area", "air_temp_deg_c", "temp_anomaly_deg_c",
