@@ -69,6 +69,44 @@ HIGH_VISIBILITY_PALETTE = [
     "#7C4DFF",  # Bright Electric Violet
 ]
 
+# Accessible, distinct business color assignments
+BUSINESS_PALETTE = {
+    "square_pos_live": "#38BDF8",       # Bright Sky Blue (Square POS)
+    "stripe_gateway_live": "#14B8A6",   # Vibrant Teal (Stripe Checkout)
+    "dine_in_restaurant": "#F59E0B",    # Amber (Dine-In Restaurant)
+    "food_delivery": "#FB7185",         # Coral / Rose (On-Demand Food Delivery)
+    "rideshare_fleet": "#A855F7",       # Purple (Urban Rideshare)
+    "bikeshare_network": "#06B6D4",     # Cyan (Micromobility)
+    "specialty_apparel": "#EC4899",     # Hot Pink (Weather Apparel)
+    "supermarket": "#10B981",           # Emerald Green (Supermarkets)
+    "convenience_store": "#F97316",     # Orange (Convenience Stores)
+    "car_wash": "#6366F1",              # Indigo (Automated Car Washes)
+    "hvac_repair": "#EAB308",           # Yellow (HVAC Repair)
+    "home_improvement": "#84CC16",      # Lime Green (Home Repair)
+    "ice_cream_beverage": "#00E5FF",    # Aqua (Ice Cream & Beverages)
+    "cinema_entertainment": "#8B5CF6",  # Violet (Cinemas & Arcades)
+    "freight_logistics": "#94A3B8",     # Slate Gray (Freight Trucking)
+    "urgent_care": "#EF4444"            # Crimson Red (Urgent Care & Pharmacies)
+}
+
+def get_biz_color(b_key: str, idx: int = 0) -> str:
+    if b_key in BUSINESS_PALETTE:
+        return BUSINESS_PALETTE[b_key]
+    return HIGH_VISIBILITY_PALETTE[idx % len(HIGH_VISIBILITY_PALETTE)]
+
+def get_biz_clean_label(b_key: str, catalog_entry: dict) -> str:
+    name = catalog_entry.get("name", b_key) if isinstance(catalog_entry, dict) else str(catalog_entry)
+    if "square_pos" in b_key:
+        return "Square POS"
+    if "stripe" in b_key:
+        return "Stripe Checkout"
+    if "dine_in" in b_key:
+        return "Dine-In Restaurant"
+    if "food_delivery" in b_key:
+        return "On-Demand Food Delivery"
+    clean = name.split(" Live")[0].split(" (")[0].strip()
+    return clean
+
 # Page configuration
 st.set_page_config(
     page_title="Weather Business Intelligence",
@@ -852,7 +890,9 @@ with tab1:
         if b_key not in active_catalog:
             continue
         cfg = active_catalog[b_key]
-        trace_color = cfg.get("color", "#38BDF8")
+        biz_color = get_biz_color(b_key, idx)
+        biz_label = get_biz_clean_label(b_key, cfg)
+        biz_sym = cfg.get("symbol", "circle")
         
         cdata_actual = np.column_stack([
             [cfg['name']] * len(past_week),
@@ -869,9 +909,10 @@ with tab1:
             x=x_labels,
             y=past_week[f"{b_key}_actual_rev"],
             mode="lines+markers",
-            name=f"{cfg['name']} (Actual)",
-            line=dict(color="#FFFFFF", width=3.0, dash="solid"),
-            marker=dict(size=8, color="#FFFFFF", symbol=cfg.get("symbol", "circle")),
+            name=f"{biz_label} — Actual",
+            legendgroup=b_key,
+            line=dict(color=biz_color, width=2.8, dash="solid"),
+            marker=dict(size=7, color=biz_color, symbol=biz_sym),
             customdata=cdata_actual,
             hovertemplate=(
                 "<b>%{customdata[0]}</b><br>"
@@ -887,8 +928,10 @@ with tab1:
             x=x_labels,
             y=past_week[f"{b_key}_baseline_rev"],
             mode="lines",
-            name=f"{cfg['name']} (Baseline)",
-            line=dict(color="#FFFFFF", width=1.6, dash="dot"),
+            name=f"{biz_label} — Baseline",
+            legendgroup=b_key,
+            line=dict(color=biz_color, width=1.8, dash="dash"),
+            opacity=0.65,
             showlegend=True,
             customdata=cdata_actual,
             hovertemplate=(
@@ -912,10 +955,11 @@ with tab1:
         y=past_week["precip_accumulation_mm"],
         mode="lines+markers",
         name="Rainfall (mm)",
-        line=dict(color="#FFFFFF", width=2.0),
-        marker=dict(size=6, color="#FFFFFF", symbol="circle-open"),
+        showlegend=False,
+        line=dict(color="#38BDF8", width=2.0),
+        marker=dict(size=6, color="#38BDF8", symbol="circle-open"),
         fill="tozeroy",
-        fillcolor="rgba(255, 255, 255, 0.12)",
+        fillcolor="rgba(56, 189, 248, 0.12)",
         customdata=cdata_rain,
         hovertemplate=(
             "<b>Rainfall Volume</b><br>"
@@ -925,24 +969,40 @@ with tab1:
         )
     ), row=2, col=1)
     
+    fig_7d.add_annotation(
+        text="<span style='color:#38BDF8;'>■</span> <b>Rainfall (mm)</b>",
+        xref="paper", yref="paper",
+        x=0.99, y=0.31,
+        showarrow=False,
+        xanchor="right", yanchor="bottom",
+        font=dict(size=10.5, color="#94A3B8"),
+        bgcolor="rgba(17, 24, 39, 0.85)",
+        bordercolor="rgba(56, 189, 248, 0.25)",
+        borderwidth=1,
+        borderpad=4
+    )
+    
     fig_7d.for_each_annotation(lambda a: a.update(font=dict(size=12, color="#E2E8F0")))
     fig_7d.update_layout(
         template="plotly_dark",
         paper_bgcolor="#111827",
         plot_bgcolor="#111827",
         font=dict(family="Plus Jakarta Sans, sans-serif", size=11, color="#F8FAFC"),
-        margin=dict(l=15, r=15, t=40, b=75),
+        height=530,
+        margin=dict(l=15, r=15, t=40, b=120),
         yaxis=dict(title="Revenue ($)", gridcolor="rgba(56, 189, 248, 0.10)", zeroline=False),
         yaxis2=dict(title="Rain (mm)", gridcolor="rgba(56, 189, 248, 0.10)", zeroline=False),
         legend=dict(
             orientation="h",
             yanchor="top",
-            y=-0.22,
+            y=-0.26,
             xanchor="center",
             x=0.5,
-            bgcolor="rgba(17, 24, 39, 0.7)",
-            bordercolor="rgba(255, 255, 255, 0.1)",
-            borderwidth=1
+            font=dict(size=10.5, color="#E2E8F0"),
+            bgcolor="rgba(17, 24, 39, 0.8)",
+            bordercolor="rgba(255, 255, 255, 0.12)",
+            borderwidth=1,
+            tracegroupgap=8
         )
     )
     st.plotly_chart(fig_7d, use_container_width=True)
@@ -1017,7 +1077,7 @@ with tab1:
 # ==============================================================================
 with tab2:
     st.subheader(f"Historical Trends & Seasonality — {city_names[selected_city]}")
-    st.markdown("Macro-level revenue timelines and econometric separation of true weather shocks from calendar trends.")
+    st.markdown("Macro Revenue Trends & Weather Impact")
     
     horizon = st.selectbox("Timeline Range:", ["Last 3 Months (90 Days)", "Last 6 Months (180 Days)", "Full 2 Years (All Data)"], index=1)
     if "3 Months" in horizon:
@@ -1052,7 +1112,9 @@ with tab2:
         if b_key not in active_catalog:
             continue
         cfg = active_catalog[b_key]
-        trace_color = cfg.get("color", "#38BDF8")
+        biz_color = get_biz_color(b_key, idx)
+        biz_label = get_biz_clean_label(b_key, cfg)
+        biz_sym = cfg.get("symbol", "circle")
         
         cdata_lt = np.column_stack([
             [cfg['name']] * len(weekly_lt),
@@ -1066,9 +1128,10 @@ with tab2:
             x=weekly_lt["year_week"],
             y=weekly_lt[f"{b_key}_actual_rev"],
             mode="lines+markers",
-            name=f"{cfg['name']}",
-            line=dict(color="#FFFFFF", width=3.0, dash="solid"),
-            marker=dict(size=7, color="#FFFFFF", symbol=cfg.get("symbol", "circle")),
+            name=biz_label,
+            legendgroup=b_key,
+            line=dict(color=biz_color, width=2.8, dash="solid"),
+            marker=dict(size=7, color=biz_color, symbol=biz_sym),
             customdata=cdata_lt,
             hovertemplate=(
                 "<b>%{customdata[0]}</b><br>"
@@ -1090,9 +1153,10 @@ with tab2:
         y=weekly_lt["precip_accumulation_mm"],
         mode="lines",
         name="Rainfall (mm)",
-        line=dict(color="#FFFFFF", width=1.8),
+        showlegend=False,
+        line=dict(color="#38BDF8", width=1.8),
         fill="tozeroy",
-        fillcolor="rgba(255, 255, 255, 0.12)",
+        fillcolor="rgba(56, 189, 248, 0.12)",
         customdata=cdata_lt_rain,
         hovertemplate=(
             "<b>Weekly Rainfall</b><br>"
@@ -1101,24 +1165,40 @@ with tab2:
         )
     ), row=2, col=1)
     
+    fig_lt.add_annotation(
+        text="<span style='color:#38BDF8;'>■</span> <b>Weekly Rainfall (mm)</b>",
+        xref="paper", yref="paper",
+        x=0.99, y=0.31,
+        showarrow=False,
+        xanchor="right", yanchor="bottom",
+        font=dict(size=10.5, color="#94A3B8"),
+        bgcolor="rgba(17, 24, 39, 0.85)",
+        bordercolor="rgba(56, 189, 248, 0.25)",
+        borderwidth=1,
+        borderpad=4
+    )
+    
     fig_lt.for_each_annotation(lambda a: a.update(font=dict(size=12, color="#E2E8F0")))
     fig_lt.update_layout(
         template="plotly_dark",
         paper_bgcolor="#111827",
         plot_bgcolor="#111827",
         font=dict(family="Plus Jakarta Sans, sans-serif", size=11, color="#F8FAFC"),
-        margin=dict(l=15, r=15, t=40, b=75),
+        height=530,
+        margin=dict(l=15, r=15, t=40, b=120),
         yaxis=dict(title="Revenue ($)", gridcolor="rgba(56, 189, 248, 0.10)", zeroline=False),
         yaxis2=dict(title="Rain (mm)", gridcolor="rgba(56, 189, 248, 0.10)", zeroline=False),
         legend=dict(
             orientation="h",
             yanchor="top",
-            y=-0.22,
+            y=-0.26,
             xanchor="center",
             x=0.5,
-            bgcolor="rgba(17, 24, 39, 0.7)",
-            bordercolor="rgba(255, 255, 255, 0.1)",
-            borderwidth=1
+            font=dict(size=10.5, color="#E2E8F0"),
+            bgcolor="rgba(17, 24, 39, 0.8)",
+            bordercolor="rgba(255, 255, 255, 0.12)",
+            borderwidth=1,
+            tracegroupgap=8
         )
     )
     st.plotly_chart(fig_lt, use_container_width=True)
@@ -1258,7 +1338,9 @@ with tab3:
         if b_key not in active_catalog:
             continue
         cfg = active_catalog[b_key]
-        trace_color = cfg.get("color", "#38BDF8")
+        biz_color = get_biz_color(b_key, idx)
+        biz_label = get_biz_clean_label(b_key, cfg)
+        biz_sym = cfg.get("symbol", "circle")
         
         cdata_30 = np.column_stack([
             [cfg['name']] * len(recent_30),
@@ -1273,9 +1355,10 @@ with tab3:
             x=recent_30["date_str"],
             y=recent_30[f"{b_key}_net_impact"],
             mode="lines+markers",
-            name=f"{cfg['name']}",
-            line=dict(color="#FFFFFF", width=3.0, dash="solid"),
-            marker=dict(size=8, color="#FFFFFF", symbol=cfg.get("symbol", "circle")),
+            name=biz_label,
+            legendgroup=b_key,
+            line=dict(color=biz_color, width=2.8, dash="solid"),
+            marker=dict(size=7, color=biz_color, symbol=biz_sym),
             customdata=cdata_30,
             hovertemplate=(
                 "<b>%{customdata[0]}</b><br>"
@@ -1289,17 +1372,20 @@ with tab3:
         paper_bgcolor="#111827",
         plot_bgcolor="#111827",
         font=dict(family="Plus Jakarta Sans, sans-serif", size=11, color="#F8FAFC"),
-        margin=dict(l=15, r=15, t=30, b=75),
+        height=500,
+        margin=dict(l=15, r=15, t=30, b=110),
         yaxis=dict(title="Sales Shift ($ USD)", gridcolor="rgba(56, 189, 248, 0.10)", zeroline=True, zerolinecolor="rgba(56, 189, 248, 0.35)"),
         legend=dict(
             orientation="h",
             yanchor="top",
-            y=-0.22,
+            y=-0.26,
             xanchor="center",
             x=0.5,
-            bgcolor="rgba(17, 24, 39, 0.7)",
-            bordercolor="rgba(255, 255, 255, 0.1)",
-            borderwidth=1
+            font=dict(size=10.5, color="#E2E8F0"),
+            bgcolor="rgba(17, 24, 39, 0.8)",
+            bordercolor="rgba(255, 255, 255, 0.12)",
+            borderwidth=1,
+            tracegroupgap=8
         )
     )
     st.plotly_chart(fig_corr, use_container_width=True)
@@ -1309,8 +1395,8 @@ with tab3:
 # TAB 4: LIVE SCENARIO SIMULATOR & AI GUIDANCE
 # ==============================================================================
 with tab4:
-    st.subheader(f"Live AI Operational Nowcast & Strategic Guidance — {city_names[selected_city]}")
-    st.markdown("Real-time operational shock analysis powered directly by current live meteorology and multi-source 7-day forward projections.")
+    live_city_label = "NYC" if selected_city == "NYC" or city_names.get(selected_city) == "New York City" else city_names.get(selected_city, selected_city)
+    st.subheader(f"Live Weather Intelligence & Business Impact Forecast — {live_city_label}")
     
     # Automatic Live Condition Initialization
     now_dt = datetime.datetime.now()
@@ -1331,8 +1417,6 @@ with tab4:
         sim_dow != live_dow or sim_hour != live_hour or 
         abs(sim_rain - live_rain) > 0.01 or abs(sim_temp_anom - live_temp_anom) > 0.01
     )
-    status_mode_label = "CUSTOM SIMULATION PARAMETERS ACTIVE" if is_custom_simulation else "DIRECT LIVE WEATHER TELEMETRY ACTIVE"
-    status_badge_color = "#38BDF8" if is_custom_simulation else "#00E676"
     
     # Execute econometric shock simulation
     sim_output = engine.simulate_cross_sector_scenario(
@@ -1347,6 +1431,11 @@ with tab4:
         wind_kmh=live_wind
     )
     
+    custom_badge_html = '''<div style="display: flex; align-items: center; gap: 8px;">
+            <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: #38BDF8; box-shadow: 0 0 8px #38BDF8;"></span>
+            <span style="font-size: 0.78rem; font-weight: 600; color: #38BDF8;">CUSTOM SIMULATION PARAMETERS ACTIVE</span>
+        </div>''' if is_custom_simulation else ""
+    
     # Clean Live Status Banner
     st.markdown(f"""
     <div style="background: rgba(17, 24, 39, 0.95); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 10px; padding: 12px 18px; margin: 8px 0 16px 0; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
@@ -1356,10 +1445,7 @@ with tab4:
             <span style="color: #E2E8F0;">{cur_w['condition']}</span> 
             (<strong style="color: #FFFFFF;">{sim_rain:.1f} mm/h rain</strong>, <strong style="color: #FFFFFF;">{sim_temp_anom:+.1f}°C anomaly</strong>)
         </div>
-        <div style="display: flex; align-items: center; gap: 8px;">
-            <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: {status_badge_color}; box-shadow: 0 0 8px {status_badge_color};"></span>
-            <span style="font-size: 0.78rem; font-weight: 600; color: {status_badge_color};">{status_mode_label}</span>
-        </div>
+        {custom_badge_html}
     </div>
     """, unsafe_allow_html=True)
     
@@ -1380,7 +1466,7 @@ with tab4:
             st.markdown(card_html, unsafe_allow_html=True)
             
     # Clean, Compact "What-If" Exploration Expander (Allows user to tweak if desired)
-    with st.expander("Adjust Parameters for Custom 'What-If' Exploration (Optional)"):
+    with st.expander("Customize What-If Scenarios (Optional)"):
         st.caption("Change day, hour, or weather intensity to test hypothetical conditions against the live baseline.")
         sim_c1, sim_c2, sim_c3, sim_c4 = st.columns(4)
         with sim_c1:
@@ -1411,8 +1497,8 @@ with tab4:
     st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
     
     # Direct 7-Day Multi-Source Forecast (Fully Live, No Mock Scenarios)
-    st.markdown("#### Projected 7-Day Revenue Line Forecast (Real-World Meteorology)")
-    st.caption(f"Projected daily revenue across your active portfolio powered by the live Open-Meteo & NASA POWER consensus for {live_weather_pkg['city_name']}.")
+    st.markdown("#### 7-Day Revenue Forecast & Weather Outlook")
+    st.caption(f"Projected daily revenue across your {live_city_label} business portfolio based on weather forecasts.")
     
     daily_fc = live_weather_pkg.get("daily_forecast", [])
     
@@ -1440,7 +1526,9 @@ with tab4:
     
     for idx, (b_key, p_info) in enumerate(forecast_data["projections"].items()):
         cfg = active_catalog.get(b_key, {})
-        trace_color = cfg.get("color", "#00D2FF")
+        biz_color = get_biz_color(b_key, idx)
+        biz_label = get_biz_clean_label(b_key, p_info)
+        biz_sym = cfg.get("symbol", "circle")
         
         cdata_fut = np.column_stack([
             [p_info['name']] * len(days_x),
@@ -1453,9 +1541,10 @@ with tab4:
             x=days_x,
             y=p_info["actual_series"],
             mode="lines+markers",
-            name=f"{p_info['name']} (Projected)",
-            line=dict(color="#FFFFFF", width=3.0, dash="solid"),
-            marker=dict(size=8, color="#FFFFFF", symbol=cfg.get("symbol", "circle")),
+            name=f"{biz_label} — Projected",
+            legendgroup=b_key,
+            line=dict(color=biz_color, width=2.8, dash="solid"),
+            marker=dict(size=7, color=biz_color, symbol=biz_sym),
             customdata=cdata_fut,
             hovertemplate=(
                 "<b>%{customdata[0]}</b><br>"
@@ -1469,11 +1558,13 @@ with tab4:
             x=days_x,
             y=p_info["baseline_series"],
             mode="lines",
-            name=f"{p_info['name']} (Normal)",
-            line=dict(color="#FFFFFF", width=1.6, dash="dot"),
+            name=f"{biz_label} — Normal",
+            legendgroup=b_key,
+            line=dict(color=biz_color, width=1.8, dash="dash"),
+            opacity=0.65,
             customdata=cdata_fut,
             hovertemplate=(
-                "<b>%{customdata[0]} (Baseline)</b><br>"
+                "<b>%{customdata[0]} (Normal Baseline)</b><br>"
                 "Day: %{customdata[1]}<br>"
                 "Expected Normal Sales: $%{y:,.0f}<extra></extra>"
             )
@@ -1484,17 +1575,21 @@ with tab4:
         paper_bgcolor="#111827",
         plot_bgcolor="#111827",
         font=dict(family="Plus Jakarta Sans, sans-serif", size=11, color="#F8FAFC"),
-        margin=dict(l=15, r=15, t=30, b=75),
+        height=540,
+        margin=dict(l=15, r=15, t=30, b=130),
         yaxis=dict(title="Projected Daily Sales ($)", gridcolor="rgba(56, 189, 248, 0.10)", zeroline=False),
+        xaxis=dict(gridcolor="rgba(255, 255, 255, 0.05)", tickfont=dict(size=11, color="#CBD5E1")),
         legend=dict(
             orientation="h",
             yanchor="top",
-            y=-0.22,
+            y=-0.26,
             xanchor="center",
             x=0.5,
-            bgcolor="rgba(17, 24, 39, 0.7)",
-            bordercolor="rgba(255, 255, 255, 0.1)",
-            borderwidth=1
+            font=dict(size=10.5, color="#E2E8F0"),
+            bgcolor="rgba(17, 24, 39, 0.8)",
+            bordercolor="rgba(255, 255, 255, 0.12)",
+            borderwidth=1,
+            tracegroupgap=10
         )
     )
     st.plotly_chart(fig_fut, use_container_width=True)
@@ -1513,49 +1608,48 @@ with tab4:
 # TAB 5: MULTI-SOURCE DATA WRANGLING DIAGNOSTICS
 # ==============================================================================
 with tab5:
-    st.subheader(f"Multi-Source Data Wrangling Diagnostics — Pipeline Telemetry")
-    st.markdown("Demonstrating real-world data engineering rigor: Asynchronous alignment of meteorological sensor feeds with transactional POS databases.")
+    st.subheader("Data Pipeline Diagnostics & Source Integration")
     
     p1, p2, p3 = st.columns(3)
     with p1:
         st.markdown("""
-        <div class="sector-grid-card">
-            <div class="sector-title">1. Timezone & Spatial Ingestion</div>
-            <div style="font-size: 0.85rem; color: #CBD5E1; line-height: 1.5;">
-                • Harmonized <strong>4 distinct IANA timezones</strong> (America/New_York, America/Chicago, America/Los_Angeles, America/Phoenix).<br/>
-                • Handled Daylight Saving Time (DST) fold transitions safely without dropped hours.<br/>
-                • Standardized all timestamps into unified UTC spatial-temporal index.
+        <div class="sector-grid-card" style="padding: 12px 14px; margin-bottom: 8px;">
+            <div class="sector-title" style="margin-bottom: 6px; font-size: 0.88rem;">1. Timezone & Spatial Ingestion</div>
+            <div style="font-size: 0.82rem; color: #CBD5E1; line-height: 1.5;">
+                • <strong>4 IANA Timezones:</strong> Harmonized NY, Chicago, LA, Phoenix to UTC.<br/>
+                • <strong>DST Resilient:</strong> Safe fold transitions without dropped intervals.<br/>
+                • <strong>Standard Index:</strong> Unified spatial-temporal index across regions.
             </div>
         </div>
         """, unsafe_allow_html=True)
         
     with p2:
         st.markdown("""
-        <div class="sector-grid-card">
-            <div class="sector-title">2. Asynchronous Fusion & Resampling</div>
-            <div style="font-size: 0.85rem; color: #CBD5E1; line-height: 1.5;">
-                • Merged <strong>69,106 hourly meteorological records</strong> with <strong>279,249 sub-hourly 15-minute POS records</strong>.<br/>
-                • Applied cubic spline interpolation and forward-fill windowing for missing sensor dropouts.<br/>
-                • Volume-weighted temporal resampling to unified hourly analysis grain.
+        <div class="sector-grid-card" style="padding: 12px 14px; margin-bottom: 8px;">
+            <div class="sector-title" style="margin-bottom: 6px; font-size: 0.88rem;">2. Asynchronous Fusion & Resampling</div>
+            <div style="font-size: 0.82rem; color: #CBD5E1; line-height: 1.5;">
+                • <strong>Multi-Source Scale:</strong> Merged <strong>69,106 weather rows</strong> + <strong>279,249 15-min POS events</strong>.<br/>
+                • <strong>Gap Imputation:</strong> Cubic spline interpolation & forward-fill windowing.<br/>
+                • <strong>Temporal Grain:</strong> Volume-weighted resampling to 1-hour intervals.
             </div>
         </div>
         """, unsafe_allow_html=True)
         
     with p3:
         st.markdown("""
-        <div class="sector-grid-card">
-            <div class="sector-title">3. Feature Engineering & Baselines</div>
-            <div style="font-size: 0.85rem; color: #CBD5E1; line-height: 1.5;">
-                • Calculated <strong>Temperature Anomaly Shocks</strong> (Actual Temp − 30-day Rolling Seasonal Mean).<br/>
-                • Computed Cooling/Heating Degree Days (CDD/HDD).<br/>
-                • Constructed 21 multi-sector operational target metrics across 4 climatic regions.
+        <div class="sector-grid-card" style="padding: 12px 14px; margin-bottom: 8px;">
+            <div class="sector-title" style="margin-bottom: 6px; font-size: 0.88rem;">3. Feature Engineering & Baselines</div>
+            <div style="font-size: 0.82rem; color: #CBD5E1; line-height: 1.5;">
+                • <strong>Temp Anomaly:</strong> Actual Temp − 30-day Rolling Seasonal Mean.<br/>
+                • <strong>Degree Days:</strong> Dynamic CDD/HDD heating & cooling loads.<br/>
+                • <strong>21 Sector Targets:</strong> Cross-sector metrics across 4 climatic zones.
             </div>
         </div>
         """, unsafe_allow_html=True)
         
-    st.markdown("<div style='height: 15px;'></div>", unsafe_allow_html=True)
-    st.markdown("#### Live Pipeline Feed Inspector")
-    st.caption("Displaying synchronized merged records across weather telemetry and multi-sector operational streams.")
+    st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+    st.markdown("#### Live Data Pipeline Inspector")
+    st.caption("Synchronized weather and business records across operational data streams.")
     
     display_df = engine.df[engine.df["metro_area"] == selected_city].tail(25).copy()
     display_df = display_df.reset_index(drop=True)
