@@ -14,6 +14,7 @@ Full Production Implementation:
 
 import os
 import json
+import datetime
 import pandas as pd
 import numpy as np
 import streamlit as st
@@ -31,6 +32,14 @@ from src.revenue_analytics import (
     generate_future_ai_forecast,
     aggregate_daily_financials
 )
+from src.live_weather import (
+    fetch_live_weather,
+    generate_live_weather_ai_forecast
+)
+
+@st.cache_data(ttl=900)
+def get_cached_live_weather(city_code: str):
+    return fetch_live_weather(city_code)
 
 # Standard High-Visibility Palette
 HIGH_VISIBILITY_PALETTE = [
@@ -561,6 +570,30 @@ with ctrl_col2:
         options=list(city_names.keys()),
         format_func=lambda x: f"{city_names[x]} ({x})"
     )
+
+# Live Weather Telemetry Ribbon
+live_weather_pkg = get_cached_live_weather(selected_city)
+cur_w = live_weather_pkg["current"]
+is_live = cur_w.get("is_live", False)
+src_label = "LIVE API FEED" if is_live else "CACHED TELEMETRY"
+status_color = "#00E676" if is_live else "#FFB300"
+
+st.markdown(f"""
+<div style="background: rgba(17, 24, 39, 0.95); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 10px; padding: 10px 18px; margin: 6px 0 16px 0; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+    <div style="display: flex; align-items: center; gap: 10px;">
+        <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: {status_color}; box-shadow: 0 0 8px {status_color};"></span>
+        <span style="font-weight: 700; color: #F8FAFC; font-size: 0.92rem;">{cur_w['city_name']} Live Weather:</span>
+        <span style="color: #38BDF8; font-weight: 600; font-size: 0.92rem;">{cur_w['condition']}</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 16px; font-size: 0.88rem; color: #E2E8F0;">
+        <span>Temp: <strong style="color: #FFFFFF;">{cur_w['temperature_c']:.1f}°C</strong></span>
+        <span>Rain: <strong style="color: #FFFFFF;">{cur_w['precipitation_mm']:.1f} mm</strong></span>
+        <span>Humidity: <strong style="color: #FFFFFF;">{cur_w['humidity_pct']:.0f}%</strong></span>
+        <span>Wind: <strong style="color: #FFFFFF;">{cur_w['wind_kmh']:.1f} km/h</strong></span>
+        <span style="font-size: 0.76rem; color: #94A3B8; background: rgba(255,255,255,0.06); padding: 3px 8px; border-radius: 6px;">{src_label}</span>
+    </div>
+</div>
+""", unsafe_allow_html=True)
 
 # ==============================================================================
 # ON-THE-FLY CUSTOM BUSINESS CREATOR
@@ -1109,16 +1142,32 @@ with tab4:
     # Interactive What-If Simulation Controls
     st.markdown("#### Interactive What-If Simulator: 'What if rain hits Manhattan on Friday at 7 PM?'")
     
+    days_list = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    
+    sim_sync_col, _ = st.columns([2.2, 1.8])
+    with sim_sync_col:
+        if st.button("Sync Sliders with Current Live Weather Conditions"):
+            now_dt = datetime.datetime.now()
+            st.session_state["sim_day_idx"] = now_dt.weekday()
+            st.session_state["sim_hour_val"] = now_dt.hour
+            st.session_state["sim_rain_val"] = float(cur_w.get("precipitation_mm", 0.0))
+            st.session_state["sim_temp_anom_val"] = round(float(cur_w.get("temperature_c", 18.0)) - 18.0, 1)
+
+    default_day_idx = st.session_state.get("sim_day_idx", 4)
+    default_hour = st.session_state.get("sim_hour_val", 19)
+    default_rain = st.session_state.get("sim_rain_val", 8.5)
+    default_anom = st.session_state.get("sim_temp_anom_val", -3.5)
+
     sim_c1, sim_c2, sim_c3, sim_c4 = st.columns(4)
     with sim_c1:
-        sim_day = st.selectbox("Day of Week:", ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"], index=4)
-        sim_dow = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].index(sim_day)
+        sim_day = st.selectbox("Day of Week:", days_list, index=default_day_idx)
+        sim_dow = days_list.index(sim_day)
     with sim_c2:
-        sim_hour = st.slider("Hour of Day:", min_value=0, max_value=23, value=19, format="%d:00")
+        sim_hour = st.slider("Hour of Day:", min_value=0, max_value=23, value=default_hour, format="%d:00")
     with sim_c3:
-        sim_rain = st.slider("Rainfall (mm/hr):", min_value=0.0, max_value=25.0, value=8.5, step=0.5)
+        sim_rain = st.slider("Rainfall (mm/hr):", min_value=0.0, max_value=25.0, value=default_rain, step=0.5)
     with sim_c4:
-        sim_temp_anom = st.slider("Temp Anomaly vs Season (°C):", min_value=-15.0, max_value=15.0, value=-3.5, step=0.5)
+        sim_temp_anom = st.slider("Temp Anomaly vs Season (°C):", min_value=-15.0, max_value=15.0, value=default_anom, step=0.5)
         
     sim_output = engine.simulate_cross_sector_scenario(
         city=selected_city,
@@ -1154,23 +1203,53 @@ with tab4:
     
     # 7-Day Forward Line Forecast
     st.markdown("#### Projected 7-Day Revenue Line Forecast")
-    st.caption("Forecasted daily earnings for selected portfolio businesses under upcoming weather trajectory.")
+    st.caption("Forecasted daily earnings for selected portfolio businesses using real-time meteorology or stress-test scenarios.")
     
-    forecast_event = st.selectbox(
-        "Upcoming Weather Trajectory Scenario:",
-        [
-            "Heavy Mid-Week Rainstorm (Storm arriving Wed-Fri)",
-            "Winter Blizzard & Arctic Freeze (Thu-Sat)",
-            "Summer Heatwave (Highs above 38°C)",
-            "Clear & Mild Weather (Normal Conditions)"
-        ],
-        index=0
+    fc_mode = st.radio(
+        "Forecast Data Source:",
+        ["Live 7-Day Real-World Forecast (Open-Meteo API)", "Hypothetical Scenario Simulation (Stress Testing)"],
+        horizontal=True
     )
     
-    forecast_data = generate_future_ai_forecast(selected_keys, forecast_event, custom_catalog=active_catalog)
+    if fc_mode == "Live 7-Day Real-World Forecast (Open-Meteo API)":
+        daily_fc = live_weather_pkg.get("daily_forecast", [])
+        
+        st.markdown(f"**Upcoming 7-Day Real Meteorological Forecast — {live_weather_pkg['city_name']}:**")
+        w_cols = st.columns(len(daily_fc))
+        for w_idx, day_w in enumerate(daily_fc):
+            with w_cols[w_idx]:
+                rain_color = "#00D2FF" if day_w['precip_mm'] > 0 else "#64748B"
+                st.markdown(f"""
+                <div style="background: rgba(17, 24, 39, 0.90); border: 1px solid rgba(56, 189, 248, 0.20); border-radius: 8px; padding: 10px 6px; text-align: center;">
+                    <div style="font-size: 0.84rem; font-weight: 700; color: #38BDF8;">{day_w['day_name']}</div>
+                    <div style="font-size: 0.70rem; color: #94A3B8; margin-bottom: 4px;">{day_w['date'][-5:]}</div>
+                    <div style="font-size: 0.88rem; font-weight: 700; color: #F8FAFC;">{day_w['temp_max']:.0f}° / {day_w['temp_min']:.0f}°</div>
+                    <div style="font-size: 0.74rem; color: #E2E8F0; margin-top: 4px;">{day_w['condition']}</div>
+                    <div style="font-size: 0.74rem; color: {rain_color}; font-weight: 600; margin-top: 2px;">
+                        {str(round(day_w['precip_mm'], 1)) + ' mm' if day_w['precip_mm'] > 0 else '0 mm'}
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+        forecast_data = generate_live_weather_ai_forecast(selected_keys, daily_fc, custom_catalog=active_catalog)
+        forecast_scenario_label = "Live Open-Meteo Forecast"
+        days_x = forecast_data["days"]
+    else:
+        forecast_event = st.selectbox(
+            "Upcoming Weather Trajectory Scenario:",
+            [
+                "Heavy Mid-Week Rainstorm (Storm arriving Wed-Fri)",
+                "Winter Blizzard & Arctic Freeze (Thu-Sat)",
+                "Summer Heatwave (Highs above 38°C)",
+                "Clear & Mild Weather (Normal Conditions)"
+            ],
+            index=0
+        )
+        forecast_data = generate_future_ai_forecast(selected_keys, forecast_event, custom_catalog=active_catalog)
+        forecast_scenario_label = forecast_event.split('(')[0].strip()
+        days_x = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
     
     fig_fut = go.Figure()
-    days_x = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
     
     for idx, (b_key, p_info) in enumerate(forecast_data["projections"].items()):
         cfg = active_catalog.get(b_key, {})
@@ -1180,7 +1259,7 @@ with tab4:
             [p_info['name']] * len(days_x),
             days_x,
             p_info["baseline_series"],
-            [forecast_event.split('(')[0].strip()] * len(days_x)
+            [forecast_scenario_label] * len(days_x)
         ])
         
         fig_fut.add_trace(go.Scatter(
