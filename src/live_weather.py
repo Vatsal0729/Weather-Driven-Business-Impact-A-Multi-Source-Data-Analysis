@@ -216,9 +216,9 @@ def fetch_live_weather(city_code_or_coords: str) -> Dict[str, Any]:
         nasa_temp = nasa_power_data.get("temperature_c", om_temp)
         temp_delta = abs(om_temp - nasa_temp)
         if temp_delta <= 2.5:
-            consensus_rating = "High Multi-Source Agreement (Ground Station + NASA Satellite)"
+            consensus_rating = "High Data Agreement (Ground + Satellite)"
         else:
-            consensus_rating = f"Moderate Variance ({temp_delta:.1f}°C Delta Between Ground Model and Satellite Observation)"
+            consensus_rating = f"Moderate Data Variance ({temp_delta:.1f}°C Delta Between Ground and Satellite)"
 
         current_data = {
             "city_code": city_code_or_coords if city_code_or_coords in CITY_GEO else "CUSTOM",

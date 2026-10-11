@@ -547,9 +547,9 @@ st.markdown("""
 <div class="hero-container">
     <div class="hero-top-row">
         <div class="hero-title">Weather-Driven Business Intelligence</div>
-        <div class="live-badge"><span class="live-dot"></span> Live Multi-Source Telemetry Active</div>
+        <div class="live-badge"><span class="live-dot"></span> Live</div>
     </div>
-    <div class="hero-subtitle">Fully Live Data Platform: Real-Time Open-Meteo & NASA Telemetry, Hardcoded Live POS & Payments Streams, and Empirical AI Guidance.</div>
+    <div class="hero-subtitle">Live Weather APIs, Simulated Transactions & AI-Driven Insights.</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -612,11 +612,10 @@ if "selected_businesses" not in st.session_state:
 
 with ctrl_col1:
     selected_keys = st.multiselect(
-        "Active Live Portfolio (Auto-Connected POS & Stripe + Presets):",
+        "Live Portfolio",
         options=list(catalog_options.keys()),
         default=[k for k in st.session_state.selected_businesses if k in catalog_options],
-        format_func=lambda x: f"{catalog_options[x]} [{active_catalog[x].get('category', 'General')}]",
-        help="Real Square POS and Stripe payment feeds are automatically hardcoded and active."
+        format_func=lambda x: f"{catalog_options[x]} [{active_catalog[x].get('category', 'General')}]"
     )
     st.session_state.selected_businesses = selected_keys
 
@@ -628,23 +627,22 @@ worldview_url = live_weather_pkg.get("nasa_worldview_url", "https://worldview.ea
 consensus = live_weather_pkg.get("consensus_rating", "Multi-Source Feed Active")
 
 is_live = cur_w.get("is_live", False)
-src_label = "LIVE API CONSENSUS" if is_live else "CACHED TELEMETRY"
 status_color = "#00E676" if is_live else "#FFB300"
 nasa_temp = nasa_p.get("temperature_c", cur_w["temperature_c"])
+city_intel_display = "NYC" if cur_w.get("city_code") == "NYC" or cur_w.get("city_name") == "New York City" else cur_w.get("city_name", selected_city)
 
 st.markdown(f"""
 <div style="background: rgba(17, 24, 39, 0.95); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 10px; padding: 12px 18px; margin: 6px 0 16px 0;">
     <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 8px; margin-bottom: 8px;">
         <div style="display: flex; align-items: center; gap: 10px;">
             <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: {status_color}; box-shadow: 0 0 8px {status_color};"></span>
-            <span style="font-weight: 700; color: #F8FAFC; font-size: 0.94rem;">{cur_w['city_name']} Multi-Source Weather Telemetry:</span>
+            <span style="font-weight: 700; color: #F8FAFC; font-size: 0.94rem;">{city_intel_display} Live Weather Intelligence</span>
             <span style="color: #38BDF8; font-weight: 600; font-size: 0.92rem;">{cur_w['condition']}</span>
         </div>
         <div style="display: flex; align-items: center; gap: 12px; font-size: 0.88rem;">
             <a href="{worldview_url}" target="_blank" style="color: #00D2FF; text-decoration: none; font-size: 0.80rem; font-weight: 600; background: rgba(0, 210, 255, 0.12); border: 1px solid rgba(0, 210, 255, 0.35); padding: 4px 10px; border-radius: 6px;">
                 Inspect NASA Worldview Satellite Layer &rarr;
             </a>
-            <span style="font-size: 0.76rem; color: #94A3B8; background: rgba(255,255,255,0.06); padding: 4px 8px; border-radius: 6px;">{src_label}</span>
         </div>
     </div>
     <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; font-size: 0.86rem; color: #E2E8F0;">
@@ -656,7 +654,7 @@ st.markdown(f"""
             <span>Wind: <strong style="color: #FFFFFF;">{cur_w['wind_kmh']:.1f} km/h</strong></span>
         </div>
         <div style="font-size: 0.78rem; color: #38BDF8; font-weight: 500;">
-            Consensus: {consensus}
+            {consensus}
         </div>
     </div>
 </div>
@@ -665,8 +663,8 @@ st.markdown(f"""
 # ==============================================================================
 # ON-THE-FLY CUSTOM BUSINESS CREATOR
 # ==============================================================================
-with st.expander("+ Create & Add a New Custom Business Category from Scratch"):
-    st.markdown("Type any business category (e.g. *'Pet Grooming Salon'*, *'Lawn Care & Landscaping'*, *'Rooftop Cocktail Lounge'*, *'Surf & Beach Rental'*) to automatically synthesize econometric elasticities and performance stats.")
+with st.expander("+ Add Custom Business Category"):
+    st.markdown("Enter a business type (e.g., Pet Grooming or Lawn Care) to generate insights.")
     
     cc1, cc2, cc3 = st.columns([2.0, 1.5, 1.0])
     with cc1:
@@ -689,7 +687,7 @@ with st.expander("+ Create & Add a New Custom Business Category from Scratch"):
         st.write("&nbsp;")
         add_btn = st.button("Synthesize & Add", use_container_width=True)
         
-    with st.expander("Optional: Fine-Tune Sensitivity & Chart Line Color"):
+    with st.expander("Optional: Customize Chart Settings"):
         tc1, tc2, tc3, tc4 = st.columns([1.2, 1.2, 1.2, 1.0])
         with tc1:
             custom_rev_input = st.number_input("Base Daily Sales ($ USD):", min_value=1000, max_value=500000, value=35000, step=5000)
@@ -1165,7 +1163,6 @@ with tab3:
     <div class="domino-chain-container">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
             <div class="ripple-title" style="margin-bottom: 0;">Multi-Hop Domino Chain — {dynamic_cascade['city_name']} ({dynamic_cascade['regime']})</div>
-            <span class="status-neutral" style="font-size: 0.76rem;">{dynamic_cascade['weather_summary']}</span>
         </div>
         {steps_domino_html}
     </div>
