@@ -36,6 +36,12 @@ from src.live_weather import (
     fetch_live_weather,
     generate_live_weather_ai_forecast
 )
+from src.revenue_connectors import (
+    SquareConnector,
+    StripeConnector,
+    CSVRevenueConnector,
+    estimate_empirical_elasticities
+)
 
 @st.cache_data(ttl=900)
 def get_cached_live_weather(city_code: str):
@@ -653,6 +659,131 @@ with st.expander("+ Create & Add a New Custom Business Category from Scratch"):
             st.session_state.selected_businesses.append(new_slug)
         st.success(f"Successfully created '{inferred['config']['name']}' under '{inferred['config']['category']}' with color {inferred['config']['color']}! (Rain Elasticity: {inferred['config']['rain_elasticity']*100:+.1f}%, Temp Elasticity: {inferred['config']['temp_elasticity']*100:+.1f}%)")
         st.rerun()
+
+# ==============================================================================
+# REAL MERCHANT REVENUE INGESTION & POS CONNECTORS
+# ==============================================================================
+with st.expander("Connect Real Merchant Revenue (Square POS, Stripe, or CSV/Excel Upload)"):
+    st.markdown("Ingest empirical sales data to train the econometric model on your actual cash flow and extract store-specific weather elasticities.")
+    
+    conn_tabs = st.tabs(["Square POS API", "Stripe Payments API", "CSV / Excel Accounting Upload"])
+    
+    with conn_tabs[0]:
+        st.markdown("**Connect Square POS Terminal / Merchant Account**")
+        st.caption("Polls daily register settlements, net revenues, and order counts directly from Square.")
+        sq_col1, sq_col2, sq_col3 = st.columns([1.5, 1.5, 1.0])
+        with sq_col1:
+            sq_token = st.text_input("Square Access Token (Optional):", type="password", placeholder="sq0atp-...", help="Leave blank to run calibrated sandbox demo.")
+        with sq_col2:
+            sq_loc = st.text_input("Location ID (Optional):", placeholder="L12345ABCDE")
+        with sq_col3:
+            sq_prof = st.selectbox("Merchant Type:", ["restaurant", "retail"], format_func=lambda x: "Hospitality & Restaurant" if x == "restaurant" else "Retail Boutique")
+            
+        sq_btn = st.button("Ingest from Square POS", key="sq_ingest_btn")
+        if sq_btn:
+            sq_conn = SquareConnector(access_token=sq_token if sq_token else None, location_id=sq_loc if sq_loc else None)
+            df_sq = sq_conn.fetch_daily_revenue("2023-01-01", "2023-12-31", mock_profile=sq_prof)
+            
+            city_weather_daily = df_daily_base[df_daily_base["metro_area"] == selected_city]
+            res_sq = estimate_empirical_elasticities(df_sq, city_weather_daily, business_name=f"{city_names[selected_city]} Merchant (Square POS)")
+            
+            slug_sq = f"square_{sq_prof}_{selected_city.lower()}"
+            st.session_state.custom_businesses[slug_sq] = {
+                "name": f"{city_names[selected_city]} Merchant (Square POS)",
+                "category": "Hospitality & Dining" if sq_prof == "restaurant" else "Retail & Commerce",
+                "description": f"Real POS-connected store. {res_sq['summary_insight']}",
+                "color": "#FFFFFF",
+                "dash": "solid",
+                "symbol": "diamond",
+                "base_daily_rev": res_sq["base_daily_rev"],
+                "rain_elasticity": res_sq["rain_elasticity"],
+                "snow_elasticity": res_sq["snow_elasticity"],
+                "temp_elasticity": res_sq["temp_elasticity"]
+            }
+            if slug_sq not in st.session_state.selected_businesses:
+                st.session_state.selected_businesses.append(slug_sq)
+                
+            st.success(f"Connected Square POS! Empirical Findings: Baseline ${res_sq['base_daily_rev']:,.0f}/day, Rain Elasticity: {res_sq['rain_elasticity']*100:+.2f}% per mm, R²: {res_sq['r_squared']:.2f}. Added to your active business portfolio.")
+            st.rerun()
+
+    with conn_tabs[1]:
+        st.markdown("**Connect Stripe Payment Gateway**")
+        st.caption("Polls daily balance transactions, completed checkout volumes, and dispute metrics.")
+        st_col1, st_col2 = st.columns([2.0, 1.0])
+        with st_col1:
+            stripe_key = st.text_input("Stripe Restricted Key (Optional):", type="password", placeholder="rk_live_...", help="Leave blank to run calibrated sandbox demo.")
+        with st_col2:
+            stripe_prof = st.selectbox("Gateway Profile:", ["ecommerce", "subscription"], format_func=lambda x: "E-Commerce Storefront" if x == "ecommerce" else "Digital Subscription Platform")
+            
+        stripe_btn = st.button("Ingest from Stripe Gateway", key="stripe_ingest_btn")
+        if stripe_btn:
+            st_conn = StripeConnector(api_key=stripe_key if stripe_key else None)
+            df_st = st_conn.fetch_daily_revenue("2023-01-01", "2023-12-31", mock_profile=stripe_prof)
+            
+            city_weather_daily = df_daily_base[df_daily_base["metro_area"] == selected_city]
+            res_st = estimate_empirical_elasticities(df_st, city_weather_daily, business_name=f"{city_names[selected_city]} Storefront (Stripe)")
+            
+            slug_st = f"stripe_{stripe_prof}_{selected_city.lower()}"
+            st.session_state.custom_businesses[slug_st] = {
+                "name": f"{city_names[selected_city]} Brand (Stripe Connected)",
+                "category": "E-Commerce & Digital",
+                "description": f"Real gateway-connected merchant. {res_st['summary_insight']}",
+                "color": "#FFFFFF",
+                "dash": "solid",
+                "symbol": "square",
+                "base_daily_rev": res_st["base_daily_rev"],
+                "rain_elasticity": res_st["rain_elasticity"],
+                "snow_elasticity": res_st["snow_elasticity"],
+                "temp_elasticity": res_st["temp_elasticity"]
+            }
+            if slug_st not in st.session_state.selected_businesses:
+                st.session_state.selected_businesses.append(slug_st)
+                
+            st.success(f"Connected Stripe! Empirical Findings: Baseline ${res_st['base_daily_rev']:,.0f}/day, Rain Elasticity: {res_st['rain_elasticity']*100:+.2f}%, Temp Elasticity: {res_st['temp_elasticity']*100:+.2f}%, R²: {res_st['r_squared']:.2f}. Added to your active business portfolio.")
+            st.rerun()
+
+    with conn_tabs[2]:
+        st.markdown("**Upload Historical Accounting Export (CSV / Excel)**")
+        st.caption("Upload any CSV containing columns for Date and Revenue (e.g., from Toast, QuickBooks, Clover, or Xero).")
+        
+        csv_file = st.file_uploader("Upload Revenue File:", type=["csv", "xlsx", "xls"], help="Requires Date and Sales/Revenue columns.")
+        custom_uploaded_name = st.text_input("Name this business entity:", value="My Local Business")
+        
+        if csv_file is not None:
+            try:
+                if csv_file.name.endswith(".csv"):
+                    raw_df = pd.read_csv(csv_file)
+                else:
+                    raw_df = pd.read_excel(csv_file)
+                    
+                csv_conn = CSVRevenueConnector()
+                df_clean_csv, meta_csv = csv_conn.parse_dataframe(raw_df)
+                
+                st.write(f"Detected {meta_csv['total_days']} days of data. Average daily sales: **${meta_csv['avg_daily_revenue']:,.2f}**.")
+                
+                if st.button("Run Econometric Regression & Add to Portfolio"):
+                    city_weather_daily = df_daily_base[df_daily_base["metro_area"] == selected_city]
+                    res_csv = estimate_empirical_elasticities(df_clean_csv, city_weather_daily, business_name=custom_uploaded_name)
+                    
+                    slug_csv = f"uploaded_{re.sub(r'[^a-z0-9]+', '_', custom_uploaded_name.lower())[:15]}"
+                    st.session_state.custom_businesses[slug_csv] = {
+                        "name": f"{custom_uploaded_name} (Real Ingested)",
+                        "category": "Real Merchant Ingestion",
+                        "description": f"Real uploaded business. {res_csv['summary_insight']}",
+                        "color": "#FFFFFF",
+                        "dash": "solid",
+                        "symbol": "star",
+                        "base_daily_rev": res_csv["base_daily_rev"],
+                        "rain_elasticity": res_csv["rain_elasticity"],
+                        "snow_elasticity": res_csv["snow_elasticity"],
+                        "temp_elasticity": res_csv["temp_elasticity"]
+                    }
+                    if slug_csv not in st.session_state.selected_businesses:
+                        st.session_state.selected_businesses.append(slug_csv)
+                    st.success(f"Empirical Estimation Complete! Rain Elasticity: {res_csv['rain_elasticity']*100:+.2f}%, Temp Elasticity: {res_csv['temp_elasticity']*100:+.2f}%, Model R²: {res_csv['r_squared']:.2f}. Successfully integrated into dashboard.")
+                    st.rerun()
+            except Exception as e:
+                st.error(f"Error parsing file: {e}")
 
 if not selected_keys:
     st.info("Please select at least one business above or create a new custom business to view the analysis.")
