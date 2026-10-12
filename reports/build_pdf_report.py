@@ -3,7 +3,9 @@ import re
 from fpdf import FPDF
 from fpdf.enums import XPos, YPos
 
-MD_PATH = r"C:\Users\vyasv\.gemini\antigravity\brain\b3a50ffe-df6a-4036-b560-a035c17603f4\project_report.md"
+MD_WORKSPACE_PATH = r"C:\Users\vyasv\.gemini\antigravity\scratch\weather-business-impact-eda\reports\project_report.md"
+MD_BRAIN_PATH = r"C:\Users\vyasv\.gemini\antigravity\brain\b3a50ffe-df6a-4036-b560-a035c17603f4\project_report.md"
+MD_PATH = MD_WORKSPACE_PATH if os.path.exists(MD_WORKSPACE_PATH) else MD_BRAIN_PATH
 PDF_BRAIN_PATH = r"C:\Users\vyasv\.gemini\antigravity\brain\b3a50ffe-df6a-4036-b560-a035c17603f4\project_report.pdf"
 PDF_WORKSPACE_PATH = r"C:\Users\vyasv\.gemini\antigravity\scratch\weather-business-impact-eda\reports\project_report.pdf"
 
@@ -109,7 +111,7 @@ class EnterpriseReportPDF(FPDF):
             ("Platform Name:", "Weather-Driven Business Intelligence (WDBI)"),
             ("GitHub Remote:", "https://github.com/Vatsal0729/Weather-Driven-Business-Impact..."),
             ("Primary Language:", "Python 3.13 (1,600+ Lines of Production Analytics)"),
-            ("User Interface:", "Streamlit (Obsidian Dark Executive Theme)"),
+            ("User Interface:", "Flask REST API + HTML5/CSS3/JS (Backup: Streamlit)"),
             ("Econometric Engine:", "Two-Way Fixed Effects (TWFE) with HC1 Robust Standard Errors"),
             ("External Feeds:", "Open-Meteo Ground Telemetry, NASA POWER Satellite & NASA Worldview"),
             ("Revenue Connectors:", "Square POS API, Stripe Payments GMV & Custom CSV Importer"),
@@ -133,14 +135,14 @@ class EnterpriseReportPDF(FPDF):
         self.cell(self.epw, 7, "Executive Summary & Report Structure", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         
         toc_items = [
-            ("Part 1: The Big Idea", "The core business problem, real-world analogy, and core value proposition."),
-            ("Part 2: Core Vocabulary", "40+ plain-English definitions across programming, data science, economics & weather."),
-            ("Part 3: Technology Stack", "Library-by-library breakdown (Streamlit, Plotly, Pandas, Statsmodels, PyArrow)."),
-            ("Part 4: Codebase Walkthrough", "Detailed inspection of all 7 production source files and architectures."),
+            ("Part 1: The Big Idea", "The core business problem, real-world analogy, and dual architecture."),
+            ("Part 2: Core Vocabulary", "45+ plain-English definitions across programming, data science & economics."),
+            ("Part 3: Technology Stack", "Library breakdown (Flask, HTML5/CSS3/JS, Plotly, Streamlit backup)."),
+            ("Part 4: Codebase Walkthrough", "Detailed inspection of all production source files, web server and UI."),
             ("Part 5: Data Flow Architecture", "7-step end-to-end journey from synthetic factory to real-time dashboard."),
             ("Part 6: Automated Test Suite", "Verification protocol, test cases, and assertion logic."),
             ("Part 7: External Live APIs", "Open-Meteo, NASA POWER, NASA Worldview GIBS, Square POS & Stripe."),
-            ("Part 8: Visual Design System", "High-contrast dark palette, white chart lines, and zero-overlap layout geometry."),
+            ("Part 8: Visual Design System", "High-contrast dark palette, 85px non-overlapping margins & locked charts."),
             ("Part 9: Version Control History", "Commit history and feature transitions across the development lifecycle."),
             ("Part 10: Comparative Benchmarks", "What standard academic projects do vs. what this platform accomplishes.")
         ]
