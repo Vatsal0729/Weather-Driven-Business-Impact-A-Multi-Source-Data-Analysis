@@ -7,8 +7,11 @@ import os
 import json
 import numpy as np
 import pandas as pd
-import statsmodels.api as sm
-import statsmodels.formula.api as smf
+
+try:
+    import statsmodels.formula.api as smf
+except Exception:
+    smf = None
 
 
 class WeatherEconometricsEngine:
