@@ -89,9 +89,11 @@ python src/data_pipeline.py
 
 ### 3. Launch the Interactive Dashboard
 ```bash
-streamlit run app.py
+python website/server.py
 ```
-Open your browser at `http://localhost:8501`.
+Open your browser at `http://localhost:5000` (or double-click `run_website.bat`).
+*(Note: A local backup Streamlit dashboard is also retained locally via `streamlit run app.py` at `http://localhost:8501`).*
+
 
 ### 4. Run Automated Test Suite
 ```bash

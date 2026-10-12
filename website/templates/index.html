@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weather-Driven Business Intelligence Platform</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <!-- Plotly.js -->
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Top Hero Bar -->
+        <header class="hero-container">
+            <div class="hero-top-row">
+                <h1 class="hero-title">Weather-Driven Business Intelligence</h1>
+                <div class="live-badge"><span class="live-dot"></span> Live Intelligence</div>
+            </div>
+            <p class="hero-subtitle">Live Weather APIs, Simulated Transactions & Econometric AI Insights.</p>
+        </header>
+
+        <!-- Control Bar -->
+        <div class="control-bar">
+            <div class="city-select-wrapper">
+                <label for="citySelect">City Market</label>
+                <select id="citySelect" class="custom-select">
+                    <option value="NYC">New York City (NYC)</option>
+                    <option value="ORD">Chicago (ORD)</option>
+                    <option value="SEA">Seattle (SEA)</option>
+                    <option value="PHX">Phoenix (PHX)</option>
+                </select>
+            </div>
+            <div class="portfolio-wrapper">
+                <label>Active Monitored Portfolio (<span id="selectedCount">0</span> selected)</label>
+                <div id="portfolioChips" class="portfolio-chips-container">
+                    <!-- Populated dynamically -->
+                </div>
+            </div>
+            <div class="header-action-buttons">
+                <button id="openCustomBizModal" class="btn-secondary">+ Add Custom Business</button>
+                <button id="openUploadCsvModal" class="btn-primary">Upload POS Data</button>
+            </div>
+        </div>
+
+        <!-- Live Weather Ribbon -->
+        <section id="weatherRibbon" class="weather-ribbon">
+            <div class="weather-ribbon-top">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span class="live-dot" id="weatherLiveDot"></span>
+                    <span style="font-weight: 700; color: #F8FAFC; font-size: 0.94rem;" id="weatherCityTitle">NYC Live Weather Intelligence</span>
+                    <span style="color: #38BDF8; font-weight: 600; font-size: 0.92rem;" id="weatherCondition">Clear Sky</span>
+                </div>
+                <div>
+                    <a id="nasaWorldviewLink" href="https://worldview.earthdata.nasa.gov/" target="_blank" style="color: #00D2FF; text-decoration: none; font-size: 0.80rem; font-weight: 600; background: rgba(0, 210, 255, 0.12); border: 1px solid rgba(0, 210, 255, 0.35); padding: 5px 12px; border-radius: 6px;">
+                        Inspect NASA Worldview Satellite Layer &rarr;
+                    </a>
+                </div>
+            </div>
+            <div class="weather-ribbon-bottom">
+                <div class="weather-stats">
+                    <span>Ground Temp: <strong style="color: #FFFFFF;" id="wGroundTemp">--°C</strong></span>
+                    <span>NASA Satellite Temp: <strong style="color: #38BDF8;" id="wNasaTemp">--°C</strong></span>
+                    <span>Precipitation: <strong style="color: #FFFFFF;" id="wPrecip">-- mm/h</strong></span>
+                    <span>Humidity: <strong style="color: #FFFFFF;" id="wHumidity">--%</strong></span>
+                    <span>Wind: <strong style="color: #FFFFFF;" id="wWind">-- km/h</strong></span>
+                </div>
+                <div style="font-size: 0.80rem; color: #38BDF8; font-weight: 500;" id="wConsensus">
+                    High Data Agreement (Ground + Satellite)
+                </div>
+            </div>
+        </section>
+
+        <!-- Navigation Tabs -->
+        <nav class="tabs-navigation">
+            <button class="nav-tab active" data-tab="tab1">Weekly Operational Impact</button>
+            <button class="nav-tab" data-tab="tab2">Historical Trends & Seasonality</button>
+            <button class="nav-tab" data-tab="tab3">Business Interactions & Domino Chains</button>
+            <button class="nav-tab" data-tab="tab4">Live Scenario Simulator & AI Guidance</button>
+            <button class="nav-tab" data-tab="tab5">Data Sources & Processing</button>
+        </nav>
+
+        <!-- ============================================================== -->
+        <!-- TAB 1: WEEKLY OPERATIONAL IMPACT -->
+        <!-- ============================================================== -->
+        <div id="tab1" class="tab-pane active">
+            <!-- 4 Metric Cards -->
+            <div class="metrics-row">
+                <div class="metric-grid-card">
+                    <div class="metric-label">Weather Sales Shift</div>
+                    <div class="metric-number" id="kpiShift">$0</div>
+                    <div class="metric-subtext" id="kpiShiftSub">vs clear baseline</div>
+                </div>
+                <div class="metric-grid-card">
+                    <div class="metric-label">Total Earned Revenue</div>
+                    <div class="metric-number" id="kpiEarned">$0</div>
+                    <div class="metric-subtext" id="kpiEarnedSub">Normal expected: $0</div>
+                </div>
+                <div class="metric-grid-card">
+                    <div class="metric-label">Monitored Portfolio</div>
+                    <div class="metric-number" id="kpiUnits">0 Units</div>
+                    <div class="metric-subtext" id="kpiUnitsSub">Market: NYC</div>
+                </div>
+                <div class="metric-grid-card">
+                    <div class="metric-label">Past 7-Day Rainfall</div>
+                    <div class="metric-number" id="kpiRain">0.0 mm</div>
+                    <div class="metric-subtext">Total rain recorded</div>
+                </div>
+            </div>
+
+            <!-- Daily Revenue & Rainfall Chart -->
+            <div class="chart-box">
+                <div class="chart-header">
+                    <div>
+                        <div class="chart-title">Daily Revenue & Rainfall Timeline</div>
+                        <div class="chart-subtitle">Solid lines represent actual earned revenue. Dotted lines represent normal baseline sales on clear days.</div>
+                    </div>
+                </div>
+                <div id="chart7d" style="width: 100%; height: 530px;"></div>
+            </div>
+
+            <!-- Day in Review Section -->
+            <section style="margin-top: 26px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 10px;">
+                    <div>
+                        <h3 style="font-size: 1.15rem; font-weight: 700; color: #F8FAFC;">Day in Review</h3>
+                        <p style="font-size: 0.82rem; color: var(--text-muted);">Inspect weather impacts on any specific day during the past week.</p>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <label for="daySelect" style="font-size: 0.82rem; font-weight: 600; color: #CBD5E1;">Choose Date:</label>
+                        <select id="daySelect" class="custom-select" style="width: 240px; padding: 6px 10px;">
+                            <!-- Populated dynamically -->
+                        </select>
+                    </div>
+                </div>
+
+                <div id="dayHeaderSummary" style="font-size: 0.86rem; color: #CBD5E1; margin-bottom: 14px;">
+                    <!-- Date & weather summary -->
+                </div>
+
+                <div id="dayInsightsGrid" class="insights-grid">
+                    <!-- Populated dynamically -->
+                </div>
+
+                <!-- Hourly Analysis Collapsible Table -->
+                <details style="background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 12px 16px; margin-top: 14px;">
+                    <summary style="font-weight: 700; font-size: 0.88rem; color: var(--primary); cursor: pointer;">Hourly Analysis for Selected Day</summary>
+                    <div class="custom-table-container" style="margin-top: 12px;">
+                        <table class="custom-table">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Time</th>
+                                    <th>Temperature (°C)</th>
+                                    <th>Rainfall (mm)</th>
+                                    <th>Food Orders</th>
+                                    <th>Price Surge</th>
+                                    <th>Wait Time</th>
+                                    <th>Bike Trips</th>
+                                    <th>Traffic Jam</th>
+                                </tr>
+                            </thead>
+                            <tbody id="hourlyTableBody">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </details>
+            </section>
+        </div>
+
+        <!-- ============================================================== -->
+        <!-- TAB 2: HISTORICAL TRENDS & SEASONALITY -->
+        <!-- ============================================================== -->
+        <div id="tab2" class="tab-pane">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px;">
+                <div>
+                    <h3 style="font-size: 1.15rem; font-weight: 700; color: #F8FAFC;" id="historicalTitle">Historical Trends & Seasonality</h3>
+                    <p style="font-size: 0.82rem; color: var(--text-muted);">Macro revenue trends and true weather elasticity across multi-year cycles.</p>
+                </div>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <label for="horizonSelect" style="font-size: 0.82rem; font-weight: 600; color: #CBD5E1;">Timeline Range:</label>
+                    <select id="horizonSelect" class="custom-select" style="width: 220px; padding: 6px 10px;">
+                        <option value="Last 3 Months (90 Days)">Last 3 Months (90 Days)</option>
+                        <option value="Last 6 Months (180 Days)" selected>Last 6 Months (180 Days)</option>
+                        <option value="Full 2 Years (All Data)">Full 2 Years (All Data)</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Historical dual-axis Chart -->
+            <div class="chart-box">
+                <div id="chartHistorical" style="width: 100%; height: 550px;"></div>
+            </div>
+
+            <!-- Econometric Comparison Table -->
+            <section style="margin-top: 20px;">
+                <details open style="background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 14px 18px;">
+                    <summary style="font-weight: 700; font-size: 0.94rem; color: #F8FAFC; cursor: pointer; margin-bottom: 8px;">
+                        View All Metrics & Econometric Model Results (TWFE Regressions)
+                    </summary>
+                    <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 12px;">
+                        This table compares raw naive correlation against seasonality-adjusted econometric impact after removing calendar and city-level confounders.
+                    </p>
+                    <div class="custom-table-container">
+                        <table class="custom-table">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Business Metric</th>
+                                    <th>Normal Daily Average</th>
+                                    <th>Raw Temp Correlation (r)</th>
+                                    <th>Adjusted Temp Impact (% / °C)</th>
+                                    <th>Raw Rain Correlation (r)</th>
+                                    <th>Adjusted Rain Impact (% / mm)</th>
+                                    <th>Model Fit (R²)</th>
+                                    <th>Reliability (p &lt; 0.05)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="econometricTableBody">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </details>
+            </section>
+        </div>
+
+        <!-- ============================================================== -->
+        <!-- TAB 3: BUSINESS INTERACTIONS & DOMINO CHAINS -->
+        <!-- ============================================================== -->
+        <div id="tab3" class="tab-pane">
+            <div style="margin-bottom: 16px;">
+                <h3 style="font-size: 1.15rem; font-weight: 700; color: #F8FAFC;" id="dominoTitle">Business Interactions & Domino Chains</h3>
+                <p style="font-size: 0.82rem; color: var(--text-muted);">Quantifying higher-order multi-hop causal chains and indirect substitution flows across the commercial ecosystem.</p>
+            </div>
+
+            <!-- 1. Full Multi-Hop Domino Chain -->
+            <div id="dominoChainContainer" class="domino-chain-container">
+                <div class="ripple-title" id="dominoChainTitle" style="margin-bottom: 14px;">Multi-Hop Domino Chain</div>
+                <div id="dominoSteps">
+                    <!-- Populated dynamically -->
+                </div>
+            </div>
+
+            <!-- 2. Non-Linear Tipping Point Box -->
+            <div id="tippingPointCard" class="ripple-box" style="border-left-color: var(--amber); margin-bottom: 22px;">
+                <!-- Populated dynamically -->
+            </div>
+
+            <!-- 3. Per-Business Domino Cards -->
+            <h4 style="font-size: 1.05rem; font-weight: 700; color: #F8FAFC; margin-bottom: 6px;">Unique Business Domino Effects & Impact Analysis</h4>
+            <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 14px;">Granular causal chains and operational ripple effects customized for each selected business under current city weather.</p>
+            
+            <div id="bizDominosGrid" class="biz-domino-grid">
+                <!-- Populated dynamically -->
+            </div>
+
+            <!-- 4. Cross-Channel Demand Shifts -->
+            <h4 style="font-size: 1.05rem; font-weight: 700; color: #F8FAFC; margin-top: 20px; margin-bottom: 6px;">Cross-Channel Demand Shifts</h4>
+            <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 14px;">How weather-driven demand moves between in-person, indoor and digital businesses.</p>
+            <div id="substitutionLinksContainer">
+                <!-- Populated dynamically -->
+            </div>
+
+            <!-- 5. Past 30 Days Net Shift Chart -->
+            <h4 style="font-size: 1.05rem; font-weight: 700; color: #F8FAFC; margin-top: 24px; margin-bottom: 6px;">Past 30 Days Net Weather Sales Shift ($ USD)</h4>
+            <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 14px;">Tracking how weather shifted dollar earnings above or below baseline across your businesses.</p>
+            <div class="chart-box">
+                <div id="chart30d" style="width: 100%; height: 500px;"></div>
+            </div>
+        </div>
+
+        <!-- ============================================================== -->
+        <!-- TAB 4: LIVE SCENARIO SIMULATOR & AI GUIDANCE -->
+        <!-- ============================================================== -->
+        <div id="tab4" class="tab-pane">
+            <div style="margin-bottom: 14px;">
+                <h3 style="font-size: 1.15rem; font-weight: 700; color: #F8FAFC;" id="nowcastTitle">Live Weather Intelligence & Business Impact Forecast</h3>
+            </div>
+
+            <!-- Live Nowcast Conditions Banner -->
+            <div id="nowcastBanner" style="background: rgba(17, 24, 39, 0.95); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px 18px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                <!-- Populated dynamically -->
+            </div>
+
+            <!-- 6 Sector Cards -->
+            <div id="sectorPredictionsGrid" class="sector-grid">
+                <!-- Populated dynamically -->
+            </div>
+
+            <!-- What-If Simulator Expander -->
+            <details style="background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 16px 20px; margin-bottom: 24px;">
+                <summary style="font-weight: 700; font-size: 0.92rem; color: var(--primary); cursor: pointer; margin-bottom: 12px;">
+                    Customize What-If Scenarios (Optional Simulation Controls)
+                </summary>
+                <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 14px;">Change day, hour, or weather intensity to test hypothetical conditions against the live baseline.</p>
+                
+                <div class="slider-row">
+                    <div class="slider-group">
+                        <label for="simDay">Day of Week: <span id="simDayVal" style="color:#38BDF8; font-weight:700;">Monday</span></label>
+                        <select id="simDay" class="custom-select">
+                            <option value="0">Monday</option>
+                            <option value="1">Tuesday</option>
+                            <option value="2">Wednesday</option>
+                            <option value="3">Thursday</option>
+                            <option value="4">Friday</option>
+                            <option value="5">Saturday</option>
+                            <option value="6">Sunday</option>
+                        </select>
+                    </div>
+                    <div class="slider-group">
+                        <label for="simHour">Hour of Day: <span id="simHourVal" style="color:#38BDF8; font-weight:700;">12:00</span></label>
+                        <input type="range" id="simHour" class="custom-range" min="0" max="23" value="12">
+                    </div>
+                    <div class="slider-group">
+                        <label for="simRain">Rainfall (mm/hr): <span id="simRainVal" style="color:#38BDF8; font-weight:700;">0.0 mm</span></label>
+                        <input type="range" id="simRain" class="custom-range" min="0" max="25" step="0.5" value="0">
+                    </div>
+                    <div class="slider-group">
+                        <label for="simTempAnom">Temp Anomaly vs Season (°C): <span id="simTempAnomVal" style="color:#38BDF8; font-weight:700;">0.0°C</span></label>
+                        <input type="range" id="simTempAnom" class="custom-range" min="-15" max="15" step="0.5" value="0">
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 10px;">
+                    <button id="btnApplySim" class="btn-primary">Apply Custom Parameters</button>
+                    <button id="btnResetLive" class="btn-secondary">Reset to Direct Live Conditions</button>
+                </div>
+            </details>
+
+            <!-- 7-Day Multi-Source Forecast -->
+            <h4 style="font-size: 1.05rem; font-weight: 700; color: #F8FAFC; margin-bottom: 6px;">7-Day Revenue Forecast & Weather Outlook</h4>
+            <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 14px;">Projected daily revenue across your business portfolio based on multi-source weather forecasts.</p>
+
+            <div id="forecastStrip" class="forecast-strip">
+                <!-- 7 weather days cards -->
+            </div>
+
+            <div class="chart-box">
+                <div id="chartForecast" style="width: 100%; height: 540px;"></div>
+            </div>
+
+            <!-- Strategic Guidance Cards -->
+            <h4 style="font-size: 1.05rem; font-weight: 700; color: #F8FAFC; margin-top: 20px; margin-bottom: 12px;">Strategic Operational Guidance</h4>
+            <div id="strategicAdviceContainer">
+                <!-- Populated dynamically -->
+            </div>
+        </div>
+
+        <!-- ============================================================== -->
+        <!-- TAB 5: DATA SOURCES & PROCESSING -->
+        <!-- ============================================================== -->
+        <div id="tab5" class="tab-pane">
+            <div style="margin-bottom: 18px;">
+                <h3 style="font-size: 1.15rem; font-weight: 700; color: #F8FAFC;">Data Sources & Processing</h3>
+                <p style="font-size: 0.82rem; color: var(--text-muted);">Multi-source synchronization architecture, spatial alignment, and feature engineering.</p>
+            </div>
+
+            <!-- 3 Architecture Cards -->
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 22px;">
+                <div class="sector-grid-card">
+                    <div class="sector-title">1. Time & Location Alignment</div>
+                    <div style="font-size: 0.82rem; color: #CBD5E1; line-height: 1.55;">
+                        • <strong>4 Cities:</strong> Data aligned across New York, Chicago, Los Angeles, and Phoenix.<br/>
+                        • <strong>Time Accuracy:</strong> Accounts for IANA time zones and daylight saving changes without dropped intervals.<br/>
+                        • <strong>Consistent Timeline:</strong> Aligns weather telemetry and business transactions into a unified index.
+                    </div>
+                </div>
+                <div class="sector-grid-card">
+                    <div class="sector-title">2. Data Integration & Preparation</div>
+                    <div style="font-size: 0.82rem; color: #CBD5E1; line-height: 1.55;">
+                        • <strong>Data Combined:</strong> Merged <strong>69,106 weather records</strong> and <strong>279,249 point-of-sale events</strong>.<br/>
+                        • <strong>Missing Data:</strong> Fills sensor dropouts using cubic spline interpolation and forward-fill windows.<br/>
+                        • <strong>Hourly Summaries:</strong> Converts 15-minute transactional records into volume-weighted hourly totals.
+                    </div>
+                </div>
+                <div class="sector-grid-card">
+                    <div class="sector-title">3. Weather & Business Metrics</div>
+                    <div style="font-size: 0.82rem; color: #CBD5E1; line-height: 1.55;">
+                        • <strong>Temperature Anomaly:</strong> Measures deviations from 30-day rolling seasonal historical baselines.<br/>
+                        • <strong>Heating & Cooling Demand:</strong> Dynamic CDD/HDD metrics estimating HVAC and energy grid loads.<br/>
+                        • <strong>21 Business Metrics:</strong> Tracks operational performance across 21 sectors in 4 climate zones.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Live Data Pipeline Inspector Table -->
+            <h4 style="font-size: 1.05rem; font-weight: 700; color: #F8FAFC; margin-bottom: 6px;">Live Data Pipeline Inspector</h4>
+            <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 14px;">Synchronized weather and business records across operational data streams (indexed 1 through N).</p>
+
+            <div class="custom-table-container">
+                <table class="custom-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Time</th>
+                            <th>City</th>
+                            <th>Temp (°C)</th>
+                            <th>Temp Anom (°C)</th>
+                            <th>Rain (mm)</th>
+                            <th>Food Orders</th>
+                            <th>Price Surge</th>
+                            <th>Bike Trips</th>
+                            <th>Rideshare Trips</th>
+                            <th>Dine-In Diners</th>
+                            <th>Mall Footfall</th>
+                            <th>Grid Load</th>
+                            <th>Freight Delay</th>
+                        </tr>
+                    </thead>
+                    <tbody id="pipelineTableBody">
+                        <!-- Populated dynamically -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ============================================================== -->
+    <!-- MODAL 1: ADD CUSTOM BUSINESS -->
+    <!-- ============================================================== -->
+    <div id="customBizModal" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 class="modal-title">+ Add Custom Business Category</h3>
+                <button class="btn-close" id="closeCustomBizModal">&times;</button>
+            </div>
+            <form id="customBizForm">
+                <div class="form-group">
+                    <label for="newBizName">Business Name</label>
+                    <input type="text" id="newBizName" class="form-input" placeholder="e.g., Rooftop Cocktail Lounge or Pet Daycare" required>
+                </div>
+                <div class="form-group">
+                    <label for="newBizCategory">Industry Classification</label>
+                    <select id="newBizCategory" class="custom-select">
+                        <option value="Auto-Detect from Name">Auto-Detect from Name</option>
+                        <option value="Outdoor & Leisure">Outdoor & Leisure</option>
+                        <option value="Indoor Entertainment">Indoor Entertainment</option>
+                        <option value="Home & Emergency Services">Home & Emergency Services</option>
+                        <option value="Health & Wellness">Health & Wellness</option>
+                        <option value="Food & Hospitality">Food & Hospitality</option>
+                        <option value="Retail & Commerce">Retail & Commerce</option>
+                        <option value="Logistics & Transport">Logistics & Transport</option>
+                        <option value="Automotive Care">Automotive Care</option>
+                    </select>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                    <div class="form-group">
+                        <label for="newBizRev">Base Daily Sales ($ USD)</label>
+                        <input type="number" id="newBizRev" class="form-input" value="35000" min="1000" max="500000" step="5000">
+                    </div>
+                    <div class="form-group">
+                        <label for="newBizColor">Accent Color</label>
+                        <input type="color" id="newBizColor" class="form-input" value="#00D2FF" style="height: 38px; padding: 2px;">
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                    <div class="form-group">
+                        <label for="newBizRain">Rain Sensitivity (% per mm)</label>
+                        <input type="number" id="newBizRain" class="form-input" value="0.0" step="0.5" min="-20" max="20">
+                    </div>
+                    <div class="form-group">
+                        <label for="newBizTemp">Heat Sensitivity (% per °C)</label>
+                        <input type="number" id="newBizTemp" class="form-input" value="0.0" step="0.5" min="-15" max="15">
+                    </div>
+                </div>
+                <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px;">
+                    <button type="button" class="btn-secondary" id="cancelCustomBiz">Cancel</button>
+                    <button type="submit" class="btn-primary">Synthesize & Add</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ============================================================== -->
+    <!-- MODAL 2: UPLOAD CSV / EXCEL POS DATA -->
+    <!-- ============================================================== -->
+    <div id="uploadCsvModal" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 class="modal-title">Merchant Data Ingestion</h3>
+                <button class="btn-close" id="closeUploadCsvModal">&times;</button>
+            </div>
+            <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 14px;">
+                Upload a point-of-sale CSV or Excel export to calibrate empirical weather elasticities on your own store.
+            </p>
+            <form id="uploadCsvForm">
+                <div class="form-group">
+                    <label for="storeName">Store / Merchant Name</label>
+                    <input type="text" id="storeName" class="form-input" value="My Local Store" required>
+                </div>
+                <div class="form-group">
+                    <label for="csvFileInput">Select File (.csv, .xlsx, .xls)</label>
+                    <input type="file" id="csvFileInput" class="form-input" accept=".csv, .xlsx, .xls" required>
+                </div>
+                <div id="uploadStatusText" style="font-size: 0.82rem; margin: 10px 0;"></div>
+                <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px;">
+                    <button type="button" class="btn-secondary" id="cancelUploadCsv">Cancel</button>
+                    <button type="submit" class="btn-primary" id="btnSubmitUpload">Run Regression & Add</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- App JavaScript Logic -->
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

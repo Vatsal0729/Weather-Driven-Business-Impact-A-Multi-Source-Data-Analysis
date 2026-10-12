@@ -1,0 +1,958 @@
+// Weather-Driven Business Intelligence Platform - Standalone Web Client
+
+const state = {
+    city: "NYC",
+    catalog: [],
+    selectedKeys: ["square_pos_live", "stripe_gateway_live", "food_delivery", "dine_in_restaurant"],
+    customBusinesses: {},
+    weather: null,
+    activeTab: "tab1",
+    inspectedDayIdx: 6,
+    horizon: "Last 6 Months (180 Days)",
+    simDow: 0,
+    simHour: 12,
+    simRain: 0.0,
+    simTempAnom: 0.0,
+    simWind: 12.0,
+    isCustomSim: false
+};
+
+// --- INITIALIZATION ---
+document.addEventListener("DOMContentLoaded", async () => {
+    setupTabNavigation();
+    setupEventListeners();
+    await loadInitialState();
+});
+
+// Setup Tab Switching
+function setupTabNavigation() {
+    const tabs = document.querySelectorAll(".nav-tab");
+    tabs.forEach(tab => {
+        tab.addEventListener("click", () => {
+            tabs.forEach(t => t.classList.remove("active"));
+            document.querySelectorAll(".tab-pane").forEach(p => p.classList.remove("active"));
+
+            tab.classList.add("active");
+            const targetId = tab.getAttribute("data-tab");
+            document.getElementById(targetId).classList.add("active");
+            state.activeTab = targetId;
+
+            // Trigger chart resize for any Plotly chart in the newly visible tab
+            setTimeout(() => {
+                window.dispatchEvent(new Event('resize'));
+            }, 60);
+
+            // Fetch data for the active tab if needed
+            if (targetId === "tab3") {
+                loadDominoData();
+            } else if (targetId === "tab4") {
+                loadNowcastData();
+            } else if (targetId === "tab5") {
+                loadDiagnosticsData();
+            }
+        });
+    });
+}
+
+// Setup Event Listeners
+function setupEventListeners() {
+    // City Selector
+    document.getElementById("citySelect").addEventListener("change", async (e) => {
+        state.city = e.target.value;
+        await refreshAllForNewCity();
+    });
+
+    // Day in Review Select
+    document.getElementById("daySelect").addEventListener("change", async (e) => {
+        state.inspectedDayIdx = parseInt(e.target.value);
+        await loadPortfolioData();
+    });
+
+    // Horizon Select (Tab 2)
+    document.getElementById("horizonSelect").addEventListener("change", async (e) => {
+        state.horizon = e.target.value;
+        await loadPortfolioData();
+    });
+
+    // What-If Sliders (Tab 4)
+    const simHour = document.getElementById("simHour");
+    const simRain = document.getElementById("simRain");
+    const simTempAnom = document.getElementById("simTempAnom");
+    const simDay = document.getElementById("simDay");
+
+    simHour.addEventListener("input", (e) => {
+        document.getElementById("simHourVal").textContent = `${String(e.target.value).padStart(2, '0')}:00`;
+    });
+    simRain.addEventListener("input", (e) => {
+        document.getElementById("simRainVal").textContent = `${parseFloat(e.target.value).toFixed(1)} mm`;
+    });
+    simTempAnom.addEventListener("input", (e) => {
+        const val = parseFloat(e.target.value);
+        document.getElementById("simTempAnomVal").textContent = `${val >= 0 ? '+' : ''}${val.toFixed(1)}°C`;
+    });
+    simDay.addEventListener("change", (e) => {
+        const dayNames = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+        document.getElementById("simDayVal").textContent = dayNames[e.target.value];
+    });
+
+    // Simulation Buttons
+    document.getElementById("btnApplySim").addEventListener("click", () => {
+        state.simDow = parseInt(simDay.value);
+        state.simHour = parseInt(simHour.value);
+        state.simRain = parseFloat(simRain.value);
+        state.simTempAnom = parseFloat(simTempAnom.value);
+        state.isCustomSim = true;
+        loadNowcastData();
+    });
+
+    document.getElementById("btnResetLive").addEventListener("click", () => {
+        resetSimulationToLive();
+        loadNowcastData();
+    });
+
+    // Custom Business Modal
+    const customModal = document.getElementById("customBizModal");
+    document.getElementById("openCustomBizModal").addEventListener("click", () => customModal.classList.add("active"));
+    document.getElementById("closeCustomBizModal").addEventListener("click", () => customModal.classList.remove("active"));
+    document.getElementById("cancelCustomBiz").addEventListener("click", () => customModal.classList.remove("active"));
+
+    document.getElementById("customBizForm").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const name = document.getElementById("newBizName").value.trim();
+        const category_hint = document.getElementById("newBizCategory").value;
+        const custom_rev = parseFloat(document.getElementById("newBizRev").value);
+        const custom_color = document.getElementById("newBizColor").value;
+        const custom_rain = parseFloat(document.getElementById("newBizRain").value);
+        const custom_temp = parseFloat(document.getElementById("newBizTemp").value);
+
+        try {
+            const resp = await fetch("/api/custom-business", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ name, category_hint, custom_rev, custom_color, custom_rain, custom_temp })
+            });
+            const res = await resp.json();
+            if (res.success) {
+                state.customBusinesses[res.slug] = res.config;
+                if (!state.selectedKeys.includes(res.slug)) {
+                    state.selectedKeys.push(res.slug);
+                }
+                customModal.classList.remove("active");
+                document.getElementById("customBizForm").reset();
+                await loadInitialState();
+            }
+        } catch (err) {
+            alert("Error creating business: " + err);
+        }
+    });
+
+    // Upload CSV Modal
+    const uploadModal = document.getElementById("uploadCsvModal");
+    document.getElementById("openUploadCsvModal").addEventListener("click", () => uploadModal.classList.add("active"));
+    document.getElementById("closeUploadCsvModal").addEventListener("click", () => uploadModal.classList.remove("active"));
+    document.getElementById("cancelUploadCsv").addEventListener("click", () => uploadModal.classList.remove("active"));
+
+    document.getElementById("uploadCsvForm").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const fileInput = document.getElementById("csvFileInput");
+        if (!fileInput.files.length) return;
+
+        const formData = new FormData();
+        formData.append("file", fileInput.files[0]);
+        formData.append("store_name", document.getElementById("storeName").value);
+        formData.append("city", state.city);
+
+        const statusEl = document.getElementById("uploadStatusText");
+        statusEl.innerHTML = "<span style='color:#38BDF8;'>Analyzing transaction history and computing weather regressions...</span>";
+
+        try {
+            const resp = await fetch("/api/upload-csv", {
+                method: "POST",
+                body: formData
+            });
+            const res = await resp.json();
+            if (res.success) {
+                state.customBusinesses[res.slug] = res.config;
+                if (!state.selectedKeys.includes(res.slug)) {
+                    state.selectedKeys.push(res.slug);
+                }
+                uploadModal.classList.remove("active");
+                document.getElementById("uploadCsvForm").reset();
+                statusEl.innerHTML = "";
+                await loadInitialState();
+            } else {
+                statusEl.innerHTML = `<span style='color:#FF5252;'>Error: ${res.error}</span>`;
+            }
+        } catch (err) {
+            statusEl.innerHTML = `<span style='color:#FF5252;'>Upload failed: ${err}</span>`;
+        }
+    });
+}
+
+// --- DATA FETCHING & RENDERING ---
+
+async function loadInitialState() {
+    try {
+        const resp = await fetch(`/api/initial-state?city=${state.city}`);
+        const data = await resp.json();
+
+        state.catalog = data.catalog;
+        state.weather = data.weather;
+
+        // Render Portfolio Chips
+        renderPortfolioChips();
+
+        // Update Weather Ribbon
+        renderWeatherRibbon(data.weather);
+
+        // Reset Nowcast Defaults
+        resetSimulationToLive();
+
+        // Load Tab 1 & Tab 2
+        await loadPortfolioData();
+
+        // If another tab was active, refresh it too
+        if (state.activeTab === "tab3") await loadDominoData();
+        if (state.activeTab === "tab4") await loadNowcastData();
+        if (state.activeTab === "tab5") await loadDiagnosticsData();
+
+    } catch (err) {
+        console.error("Failed to load initial state:", err);
+    }
+}
+
+async function refreshAllForNewCity() {
+    try {
+        const resp = await fetch(`/api/weather?city=${state.city}`);
+        state.weather = await resp.json();
+        renderWeatherRibbon(state.weather);
+        resetSimulationToLive();
+        await loadPortfolioData();
+        if (state.activeTab === "tab3") await loadDominoData();
+        if (state.activeTab === "tab4") await loadNowcastData();
+        if (state.activeTab === "tab5") await loadDiagnosticsData();
+    } catch (err) {
+        console.error("Failed to refresh city:", err);
+    }
+}
+
+function resetSimulationToLive() {
+    const cur_w = state.weather?.current || {};
+    const now = new Date();
+    // Monday is 0 in Python
+    const dow = (now.getDay() + 6) % 7;
+    const hour = now.getHours();
+    const rain = parseFloat(cur_w.precipitation_mm || 0.0);
+    const tempAnom = Math.round((parseFloat(cur_w.temperature_c || 18.0) - 18.0) * 10) / 10;
+
+    state.simDow = dow;
+    state.simHour = hour;
+    state.simRain = rain;
+    state.simTempAnom = tempAnom;
+    state.isCustomSim = false;
+
+    // Update UI controls
+    document.getElementById("simDay").value = dow;
+    document.getElementById("simHour").value = hour;
+    document.getElementById("simRain").value = rain;
+    document.getElementById("simTempAnom").value = tempAnom;
+
+    const dayNames = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+    document.getElementById("simDayVal").textContent = dayNames[dow];
+    document.getElementById("simHourVal").textContent = `${String(hour).padStart(2, '0')}:00`;
+    document.getElementById("simRainVal").textContent = `${rain.toFixed(1)} mm`;
+    document.getElementById("simTempAnomVal").textContent = `${tempAnom >= 0 ? '+' : ''}${tempAnom.toFixed(1)}°C`;
+}
+
+// Render Portfolio Chips in Control Bar
+function renderPortfolioChips() {
+    const container = document.getElementById("portfolioChips");
+    container.innerHTML = "";
+
+    state.catalog.forEach(item => {
+        const isSelected = state.selectedKeys.includes(item.key);
+        const chip = document.createElement("div");
+        chip.className = `portfolio-chip ${isSelected ? 'active' : ''}`;
+        chip.innerHTML = `
+            <span class="chip-dot" style="background-color: ${item.color};"></span>
+            <span>${item.clean_name}</span>
+        `;
+        chip.addEventListener("click", async () => {
+            if (state.selectedKeys.includes(item.key)) {
+                if (state.selectedKeys.length <= 1) {
+                    alert("Please keep at least one business in your portfolio.");
+                    return;
+                }
+                state.selectedKeys = state.selectedKeys.filter(k => k !== item.key);
+                chip.classList.remove("active");
+            } else {
+                state.selectedKeys.push(item.key);
+                chip.classList.add("active");
+            }
+            document.getElementById("selectedCount").textContent = state.selectedKeys.length;
+            await loadPortfolioData();
+            if (state.activeTab === "tab3") await loadDominoData();
+            if (state.activeTab === "tab4") await loadNowcastData();
+        });
+        container.appendChild(chip);
+    });
+
+    document.getElementById("selectedCount").textContent = state.selectedKeys.length;
+}
+
+// Render Weather Ribbon
+function renderWeatherRibbon(pkg) {
+    if (!pkg) return;
+    const cur = pkg.current || {};
+    const nasa = pkg.nasa_power || {};
+
+    const cityMap = { "NYC": "New York City", "ORD": "Chicago", "SEA": "Seattle", "PHX": "Phoenix" };
+    document.getElementById("weatherCityTitle").textContent = `${cityMap[state.city] || state.city} Live Weather Intelligence`;
+    document.getElementById("weatherCondition").textContent = cur.condition || "Clear Sky";
+    document.getElementById("nasaWorldviewLink").href = pkg.nasa_worldview_url || "https://worldview.earthdata.nasa.gov/";
+
+    document.getElementById("wGroundTemp").textContent = `${(cur.temperature_c || 0).toFixed(1)}°C`;
+    document.getElementById("wNasaTemp").textContent = `${(nasa.temperature_c ?? cur.temperature_c ?? 0).toFixed(1)}°C`;
+    document.getElementById("wPrecip").textContent = `${(cur.precipitation_mm || 0).toFixed(1)} mm/h`;
+    document.getElementById("wHumidity").textContent = `${Math.round(cur.humidity_pct || 0)}%`;
+    document.getElementById("wWind").textContent = `${(cur.wind_kmh || 0).toFixed(1)} km/h`;
+    document.getElementById("wConsensus").textContent = pkg.consensus_rating || "Consensus Active";
+
+    const dot = document.getElementById("weatherLiveDot");
+    dot.style.background = cur.is_live ? "#00E676" : "#FFB300";
+    dot.style.boxShadow = cur.is_live ? "0 0 10px #00E676" : "0 0 10px #FFB300";
+}
+
+// Load Tab 1 & Tab 2 Portfolio Data
+async function loadPortfolioData() {
+    try {
+        const resp = await fetch("/api/portfolio-data", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                city: state.city,
+                selected_keys: state.selectedKeys,
+                custom_businesses: state.customBusinesses,
+                horizon: state.horizon,
+                inspected_day_idx: state.inspectedDayIdx
+            })
+        });
+
+        const data = await resp.json();
+        if (data.error) {
+            console.error("Portfolio error:", data.error);
+            return;
+        }
+
+        // 1. KPI Cards
+        const m = data.metrics;
+        const sign = m.total_week_impact >= 0 ? "+$" : "-$";
+        const impactEl = document.getElementById("kpiShift");
+        impactEl.textContent = `${sign}${Math.abs(Math.round(m.total_week_impact)).toLocaleString()}`;
+        impactEl.className = `metric-number ${m.total_week_impact >= 0 ? 'status-positive' : 'status-negative'}`;
+
+        document.getElementById("kpiShiftSub").innerHTML = `
+            <span class="${m.total_week_impact >= 0 ? 'status-positive' : 'status-negative'}">
+                ${m.total_week_impact >= 0 ? 'Extra Gain' : 'Lost Sales'}
+            </span> vs clear baseline
+        `;
+
+        document.getElementById("kpiEarned").textContent = `$${Math.round(m.total_week_actual).toLocaleString()}`;
+        document.getElementById("kpiEarnedSub").textContent = `Normal expected: $${Math.round(m.total_week_base).toLocaleString()}`;
+
+        document.getElementById("kpiUnits").textContent = `${m.portfolio_count} Units`;
+        document.getElementById("kpiUnitsSub").textContent = `Market: ${state.city}`;
+
+        document.getElementById("kpiRain").textContent = `${m.total_rain_week.toFixed(1)} mm`;
+
+        // 2. Render 7-Day Chart (Pure White Line Specs)
+        render7DayChart(data.chart_7d);
+
+        // 3. Render Day in Review
+        renderDayInReview(data.day_in_review, data.chart_7d);
+
+        // 4. Render Historical Timeline Chart
+        renderHistoricalChart(data.historical_timeline);
+
+        // 5. Render Econometrics Comparison Table
+        renderEconometricsTable(data.econometrics_table);
+
+    } catch (err) {
+        console.error("Failed to load portfolio data:", err);
+    }
+}
+
+// Render Tab 1 Chart
+function render7DayChart(chartData) {
+    const traces = [];
+
+    // Revenue traces for each business (Solid actual, dashed baseline)
+    chartData.businesses.forEach(b => {
+        // Actual trace (Pure White / High Vis Color, width 2.8)
+        traces.push({
+            x: chartData.x_labels,
+            y: b.actual,
+            name: `${b.clean_label} — Actual`,
+            mode: "lines+markers",
+            legendgroup: b.key,
+            line: { color: b.color, width: 2.8, shape: "linear" },
+            marker: { size: 7, color: b.color, symbol: b.symbol },
+            yaxis: "y1",
+            hovertemplate: `<b>${b.name}</b><br>Actual Sales: $%{y:,.0f}<extra></extra>`
+        });
+
+        // Baseline trace (Dashed, width 1.8)
+        traces.push({
+            x: chartData.x_labels,
+            y: b.baseline,
+            name: `${b.clean_label} — Baseline`,
+            mode: "lines",
+            legendgroup: b.key,
+            line: { color: b.color, width: 1.8, dash: "dash" },
+            opacity: 0.65,
+            yaxis: "y1",
+            hovertemplate: `<b>${b.name} (Baseline)</b><br>Expected Sales: $%{y:,.0f}<extra></extra>`
+        });
+    });
+
+    // Rainfall trace on bottom subplot (y2)
+    traces.push({
+        x: chartData.x_labels,
+        y: chartData.rainfall,
+        name: "Rainfall (mm)",
+        mode: "lines+markers",
+        line: { color: "#38BDF8", width: 2.0 },
+        marker: { size: 6, color: "#38BDF8", symbol: "circle-open" },
+        fill: "tozeroy",
+        fillcolor: "rgba(56, 189, 248, 0.12)",
+        yaxis: "y2",
+        showlegend: false,
+        hovertemplate: "Rainfall: %{y:.1f} mm<extra></extra>"
+    });
+
+    const layout = {
+        template: "plotly_dark",
+        paper_bgcolor: "#111827",
+        plot_bgcolor: "#111827",
+        font: { family: "Plus Jakarta Sans, sans-serif", size: 11, color: "#F8FAFC" },
+        height: 530,
+        margin: { l: 85, r: 25, t: 30, b: 120 },
+        grid: { rows: 2, columns: 1, pattern: 'independent', roworder: 'top to bottom' },
+        yaxis: {
+            title: { text: "Revenue ($)", standoff: 18 },
+            automargin: true,
+            fixedrange: true,
+            domain: [0.38, 1.0],
+            gridcolor: "rgba(56, 189, 248, 0.10)",
+            zeroline: false
+        },
+        yaxis2: {
+            title: { text: "Rain (mm)", standoff: 18 },
+            automargin: true,
+            fixedrange: true,
+            domain: [0.0, 0.26],
+            gridcolor: "rgba(56, 189, 248, 0.10)",
+            zeroline: false
+        },
+        xaxis: {
+            fixedrange: true,
+            gridcolor: "rgba(255, 255, 255, 0.05)",
+            tickfont: { size: 10.5, color: "#CBD5E1" }
+        },
+        legend: {
+            orientation: "h",
+            yanchor: "top",
+            y: -0.28,
+            xanchor: "center",
+            x: 0.5,
+            font: { size: 10.5, color: "#E2E8F0" },
+            bgcolor: "rgba(17, 24, 39, 0.8)",
+            bordercolor: "rgba(255, 255, 255, 0.12)",
+            borderwidth: 1
+        }
+    };
+
+    Plotly.newPlot("chart7d", traces, layout, { responsive: true, displayModeBar: false, scrollZoom: false, doubleClick: false });
+}
+
+// Render Day in Review Section
+function renderDayInReview(dayReview, chart7d) {
+    const daySelect = document.getElementById("daySelect");
+    daySelect.innerHTML = "";
+
+    chart7d.dates.forEach((dt, idx) => {
+        const opt = document.createElement("option");
+        opt.value = idx;
+        opt.textContent = `${chart7d.days[idx]} (${dt}) — ${chart7d.icons[idx]}`;
+        if (idx === dayReview.inspected_idx) opt.selected = true;
+        daySelect.appendChild(opt);
+    });
+
+    document.getElementById("dayHeaderSummary").innerHTML = `
+        <strong>Date:</strong> ${dayReview.day_name} (${dayReview.date_str}) &nbsp;|&nbsp; 
+        <strong>Weather:</strong> ${dayReview.weather_icon} (${dayReview.temperature}°C, ${dayReview.rain} mm rain)
+    `;
+
+    // Render Cards
+    const grid = document.getElementById("dayInsightsGrid");
+    grid.innerHTML = "";
+
+    dayReview.insights.forEach(ins => {
+        const sign = ins.delta >= 0 ? "+$" : "-$";
+        const badgeCls = ins.delta >= 0 ? "status-positive" : "status-negative";
+        const card = document.createElement("div");
+        card.className = "insight-box";
+        card.innerHTML = `
+            <div>
+                <div class="insight-top">
+                    <span class="insight-title">${ins.name}</span>
+                    <span class="${badgeCls}">${sign}${Math.abs(Math.round(ins.delta)).toLocaleString()} (${ins.pct_change >= 0 ? '+' : ''}${ins.pct_change.toFixed(1)}%)</span>
+                </div>
+                <div style="font-size: 0.80rem; color: #94A3B8; font-weight: 600; margin-bottom: 8px;">
+                    Earned: $${Math.round(ins.actual_rev).toLocaleString()} &nbsp;|&nbsp; Normal: $${Math.round(ins.baseline_rev).toLocaleString()}
+                </div>
+                <div class="insight-content">
+                    <strong style="color: #FFFFFF;">${ins.headline}</strong><br/>
+                    ${ins.bullets.map(b => `• ${b}`).join("<br/>")}
+                </div>
+            </div>
+            <div class="insight-bottom">Category: ${ins.category || 'General'}</div>
+        `;
+        grid.appendChild(card);
+    });
+
+    // Render Hourly Table
+    const tbody = document.getElementById("hourlyTableBody");
+    tbody.innerHTML = "";
+    dayReview.hourly_table.forEach(row => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+            <td>${row.num}</td>
+            <td>${row.time}</td>
+            <td>${row.temp}°C</td>
+            <td>${row.rain} mm</td>
+            <td>${row.food_orders}</td>
+            <td>${row.price_surge}</td>
+            <td>${row.wait_time}</td>
+            <td>${row.bike_trips}</td>
+            <td>${row.traffic_jam}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+// Render Tab 2 Historical Timeline Chart
+function renderHistoricalChart(hist) {
+    const traces = [];
+
+    hist.businesses.forEach(b => {
+        traces.push({
+            x: hist.dates,
+            y: b.actual,
+            name: b.clean_label,
+            mode: "lines+markers",
+            line: { color: b.color, width: 2.8 },
+            marker: { size: 6, color: b.color, symbol: b.symbol },
+            yaxis: "y1",
+            hovertemplate: `<b>${b.name}</b><br>Date: %{x}<br>Weekly Sales: $%{y:,.0f}<extra></extra>`
+        });
+    });
+
+    traces.push({
+        x: hist.dates,
+        y: hist.rainfall,
+        name: "Weekly Rain (mm)",
+        mode: "lines",
+        line: { color: "#38BDF8", width: 1.8 },
+        fill: "tozeroy",
+        fillcolor: "rgba(56, 189, 248, 0.12)",
+        yaxis: "y2",
+        showlegend: false,
+        hovertemplate: "Weekly Rain: %{y:.1f} mm<extra></extra>"
+    });
+
+    const layout = {
+        template: "plotly_dark",
+        paper_bgcolor: "#111827",
+        plot_bgcolor: "#111827",
+        font: { family: "Plus Jakarta Sans, sans-serif", size: 11, color: "#F8FAFC" },
+        height: 550,
+        margin: { l: 85, r: 25, t: 30, b: 130 },
+        grid: { rows: 2, columns: 1, pattern: 'independent', roworder: 'top to bottom' },
+        yaxis: {
+            title: { text: "Revenue ($)", standoff: 18 },
+            automargin: true,
+            fixedrange: true,
+            domain: [0.38, 1.0],
+            gridcolor: "rgba(56, 189, 248, 0.10)",
+            zeroline: false
+        },
+        yaxis2: {
+            title: { text: "Rain (mm)", standoff: 18 },
+            automargin: true,
+            fixedrange: true,
+            domain: [0.0, 0.26],
+            gridcolor: "rgba(56, 189, 248, 0.10)",
+            zeroline: false
+        },
+        xaxis: {
+            type: "date",
+            fixedrange: true,
+            gridcolor: "rgba(56, 189, 248, 0.08)",
+            tickfont: { size: 10.5, color: "#CBD5E1" }
+        },
+        legend: {
+            orientation: "h",
+            yanchor: "top",
+            y: -0.32,
+            xanchor: "center",
+            x: 0.5,
+            font: { size: 10.5, color: "#E2E8F0" },
+            bgcolor: "rgba(17, 24, 39, 0.8)",
+            bordercolor: "rgba(255, 255, 255, 0.12)",
+            borderwidth: 1
+        }
+    };
+
+    Plotly.newPlot("chartHistorical", traces, layout, { responsive: true, displayModeBar: false, scrollZoom: false, doubleClick: false });
+}
+
+// Render Econometrics Table (Tab 2)
+function renderEconometricsTable(records) {
+    const tbody = document.getElementById("econometricTableBody");
+    tbody.innerHTML = "";
+    records.forEach(r => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+            <td>${r.num}</td>
+            <td><strong>${r.metric}</strong></td>
+            <td>${r.baseline}</td>
+            <td>${r.raw_temp_corr}</td>
+            <td>${r.adj_temp_impact}</td>
+            <td>${r.raw_rain_corr}</td>
+            <td>${r.adj_rain_impact}</td>
+            <td>${r.r2}</td>
+            <td><span class="${r.reliability.includes('Significant') ? 'status-positive' : 'status-neutral'}">${r.reliability}</span></td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+// Load Tab 3 Domino Data
+async function loadDominoData() {
+    try {
+        const resp = await fetch("/api/domino-data", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                city: state.city,
+                selected_keys: state.selectedKeys,
+                custom_businesses: state.customBusinesses
+            })
+        });
+        const data = await resp.json();
+
+        // 1. Domino Cascade Steps
+        const cascade = data.cascade;
+        document.getElementById("dominoChainTitle").textContent =
+            `Multi-Hop Domino Chain — ${cascade.city_name} (${cascade.regime})`;
+
+        const stepsContainer = document.getElementById("dominoSteps");
+        stepsContainer.innerHTML = cascade.steps.map(s => `
+            <div class="domino-step">
+                <span class="domino-num">${s.num}</span>
+                <span>${s.text}</span>
+            </div>
+        `).join("");
+
+        // 2. Tipping Point Card
+        const tp = cascade.tipping_point;
+        document.getElementById("tippingPointCard").innerHTML = `
+            <div class="ripple-title" style="color: #FBBF24;">${tp.title}</div>
+            <div style="font-size: 0.86rem; color: #CBD5E1; line-height: 1.6; margin-top: 8px;">
+                When weather conditions cross operational thresholds in <strong>${cascade.city_name}</strong>, economic channels fracture non-linearly:<br/>
+                • <strong>Customer Demand:</strong> ${tp.demand}<br/>
+                • <strong>Courier & Service Supply:</strong> ${tp.supply}<br/>
+                • <strong>Operational Outcome:</strong> ${tp.consequence}
+            </div>
+        `;
+
+        // 3. Per-Business Domino Cards
+        const bizGrid = document.getElementById("bizDominosGrid");
+        bizGrid.innerHTML = data.biz_dominos.map(b => {
+            const sign = b.delta >= 0 ? "+$" : "-$";
+            const badgeCls = b.delta >= 0 ? "status-positive" : "status-negative";
+            return `
+                <div class="biz-domino-card">
+                    <div class="biz-domino-header">
+                        <div>
+                            <div class="biz-domino-title">${b.name}</div>
+                            <div class="biz-domino-category">${b.category}</div>
+                        </div>
+                        <span class="biz-domino-badge ${badgeCls}">${sign}${Math.abs(Math.round(b.delta)).toLocaleString()} (${b.pct >= 0 ? '+' : ''}${b.pct.toFixed(1)}%)</span>
+                    </div>
+                    <div class="biz-chain-step"><strong>1. Weather Trigger:</strong> ${b.trigger}</div>
+                    <div class="biz-chain-step"><strong>2. Consumer Reaction:</strong> ${b.behavior}</div>
+                    <div class="biz-chain-step"><strong>3. Financial Effect:</strong> ${b.financial}</div>
+                    <div class="biz-downstream-box"><strong>Downstream Effects:</strong> ${b.downstream}</div>
+                    <div class="biz-countermeasure-box"><strong>Operational Countermeasure:</strong> ${b.action}</div>
+                </div>
+            `;
+        }).join("");
+
+        // 4. Cross-Channel Demand Shifts
+        const substContainer = document.getElementById("substitutionLinksContainer");
+        if (data.substitution_links && data.substitution_links.length > 0) {
+            substContainer.innerHTML = data.substitution_links.map(link => `
+                <div class="ripple-box">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span class="ripple-title">${link.title}</span>
+                        <span class="status-neutral">${link.type}</span>
+                    </div>
+                    <div style="font-size: 0.90rem; font-weight: 700; color: #38BDF8; margin: 6px 0 10px 0;">${link.summary}</div>
+                    <div style="margin-top: 8px;">
+                        ${(link.chain_steps || []).map(s => `<div class="chain-step">${s}</div>`).join("")}
+                    </div>
+                </div>
+            `).join("");
+        } else {
+            substContainer.innerHTML = `<div style="color:#94A3B8; font-size:0.85rem; padding:8px 0;">Select complementary businesses (e.g., Square POS and Stripe, or Restaurants and Food Delivery) to view substitution flows.</div>`;
+        }
+
+        // 5. Past 30 Days Net Shift Chart
+        render30DayShiftChart(data.chart_30d);
+
+    } catch (err) {
+        console.error("Failed to load domino data:", err);
+    }
+}
+
+function render30DayShiftChart(c30) {
+    const traces = c30.series.map(b => ({
+        x: c30.dates,
+        y: b.net_shifts,
+        name: b.clean_label,
+        mode: "lines+markers",
+        line: { color: b.color, width: 2.8 },
+        marker: { size: 6, color: b.color, symbol: b.symbol },
+        hovertemplate: `<b>${b.name}</b><br>Date: %{x}<br>Net Shift: $%{y:+,.0f}<extra></extra>`
+    }));
+
+    const layout = {
+        template: "plotly_dark",
+        paper_bgcolor: "#111827",
+        plot_bgcolor: "#111827",
+        font: { family: "Plus Jakarta Sans, sans-serif", size: 11, color: "#F8FAFC" },
+        height: 500,
+        margin: { l: 85, r: 25, t: 20, b: 110 },
+        yaxis: {
+            title: { text: "Sales Shift ($ USD)", standoff: 18 },
+            automargin: true,
+            fixedrange: true,
+            gridcolor: "rgba(56, 189, 248, 0.10)",
+            zeroline: true,
+            zerolinecolor: "rgba(56, 189, 248, 0.35)"
+        },
+        xaxis: {
+            fixedrange: true,
+            gridcolor: "rgba(255, 255, 255, 0.05)",
+            tickfont: { size: 10, color: "#CBD5E1" }
+        },
+        legend: {
+            orientation: "h",
+            yanchor: "top",
+            y: -0.26,
+            xanchor: "center",
+            x: 0.5,
+            font: { size: 10.5, color: "#E2E8F0" },
+            bgcolor: "rgba(17, 24, 39, 0.8)",
+            bordercolor: "rgba(255, 255, 255, 0.12)",
+            borderwidth: 1
+        }
+    };
+
+    Plotly.newPlot("chart30d", traces, layout, { responsive: true, displayModeBar: false, scrollZoom: false, doubleClick: false });
+}
+
+// Load Tab 4 Nowcast Data
+async function loadNowcastData() {
+    try {
+        const resp = await fetch("/api/nowcast", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                city: state.city,
+                selected_keys: state.selectedKeys,
+                custom_businesses: state.customBusinesses,
+                sim_dow: state.simDow,
+                sim_hour: state.simHour,
+                sim_rain: state.simRain,
+                sim_temp_anom: state.simTempAnom,
+                sim_wind: state.simWind
+            })
+        });
+
+        const data = await resp.json();
+        const p = data.sim_params;
+
+        // 1. Banner
+        const customBadge = data.is_custom ? `
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <span class="live-dot" style="background:#38BDF8; box-shadow:0 0 8px #38BDF8;"></span>
+                <span style="font-size: 0.78rem; font-weight: 700; color: #38BDF8;">CUSTOM SIMULATION PARAMETERS ACTIVE</span>
+            </div>
+        ` : "";
+
+        document.getElementById("nowcastBanner").innerHTML = `
+            <div>
+                <span style="font-weight: 700; color: #F8FAFC; font-size: 0.92rem;">Nowcasting Conditions:</span>
+                <span style="color: #38BDF8; font-weight: 600; margin-left: 6px;">${p.day_name} at ${String(p.hour).padStart(2, '0')}:00</span> &bull; 
+                <span style="color: #E2E8F0;">${p.live_condition}</span> 
+                (<strong style="color: #FFFFFF;">${p.rain.toFixed(1)} mm/h rain</strong>, <strong style="color: #FFFFFF;">${p.temp_anom >= 0 ? '+' : ''}${p.temp_anom.toFixed(1)}°C anomaly</strong>)
+            </div>
+            ${customBadge}
+        `;
+
+        // 2. Sector Prediction Cards
+        const sectorGrid = document.getElementById("sectorPredictionsGrid");
+        sectorGrid.innerHTML = "";
+        Object.entries(data.sector_predictions).forEach(([secName, metrics]) => {
+            const card = document.createElement("div");
+            card.className = "sector-grid-card";
+            card.innerHTML = `
+                <div class="sector-title">${secName}</div>
+                ${metrics.map(m => `
+                    <div class="metric-row">
+                        <span style="font-weight:600; color:#F8FAFC;">${m.display_name}</span>
+                        <span>${m.weather_impacted} ${m.unit} <span class="${m.delta_pct >= 0 ? 'status-positive' : 'status-negative'}">${m.delta_pct >= 0 ? '+' : ''}${m.delta_pct.toFixed(1)}%</span></span>
+                    </div>
+                `).join("")}
+            `;
+            sectorGrid.appendChild(card);
+        });
+
+        // 3. 7-Day Forecast Weather Strip
+        const strip = document.getElementById("forecastStrip");
+        strip.innerHTML = data.daily_forecast_strip.map(day => `
+            <div class="fc-day-card">
+                <div style="font-size: 0.84rem; font-weight: 700; color: #38BDF8;">${day.day_name}</div>
+                <div style="font-size: 0.70rem; color: #94A3B8; margin-bottom: 4px;">${day.date.slice(-5)}</div>
+                <div style="font-size: 0.88rem; font-weight: 700; color: #F8FAFC;">${Math.round(day.temp_max)}° / ${Math.round(day.temp_min)}°</div>
+                <div style="font-size: 0.74rem; color: #E2E8F0; margin-top: 4px;">${day.condition}</div>
+                <div style="font-size: 0.74rem; color: ${day.precip_mm > 0 ? '#00D2FF' : '#64748B'}; font-weight: 600; margin-top: 2px;">
+                    ${day.precip_mm > 0 ? `${day.precip_mm.toFixed(1)} mm` : '0 mm'}
+                </div>
+            </div>
+        `).join("");
+
+        // 4. Forecast Chart
+        renderForecastChart(data.forecast_chart);
+
+        // 5. Strategic Guidance Cards
+        const advContainer = document.getElementById("strategicAdviceContainer");
+        advContainer.innerHTML = data.strategic_advice.map(adv => `
+            <div class="ripple-box" style="margin-bottom: 10px; font-size: 0.86rem; color: #CBD5E1; line-height: 1.55;">
+                ${adv}
+            </div>
+        `).join("");
+
+    } catch (err) {
+        console.error("Failed to load nowcast data:", err);
+    }
+}
+
+function renderForecastChart(fc) {
+    const traces = [];
+
+    fc.series.forEach(b => {
+        traces.push({
+            x: fc.days,
+            y: b.actual_projected,
+            name: `${b.clean_label} — Projected`,
+            mode: "lines+markers",
+            legendgroup: b.key,
+            line: { color: b.color, width: 2.8 },
+            marker: { size: 7, color: b.color, symbol: b.symbol },
+            hovertemplate: `<b>${b.name}</b><br>Day: %{x}<br>Projected: $%{y:,.0f}<extra></extra>`
+        });
+
+        traces.push({
+            x: fc.days,
+            y: b.baseline,
+            name: `${b.clean_label} — Normal`,
+            mode: "lines",
+            legendgroup: b.key,
+            line: { color: b.color, width: 1.8, dash: "dash" },
+            opacity: 0.65,
+            hovertemplate: `<b>${b.name} (Normal)</b><br>Normal: $%{y:,.0f}<extra></extra>`
+        });
+    });
+
+    const layout = {
+        template: "plotly_dark",
+        paper_bgcolor: "#111827",
+        plot_bgcolor: "#111827",
+        font: { family: "Plus Jakarta Sans, sans-serif", size: 11, color: "#F8FAFC" },
+        height: 540,
+        margin: { l: 85, r: 25, t: 20, b: 130 },
+        yaxis: {
+            title: { text: "Projected Daily Sales ($)", standoff: 18 },
+            automargin: true,
+            fixedrange: true,
+            gridcolor: "rgba(56, 189, 248, 0.10)",
+            zeroline: false
+        },
+        xaxis: {
+            fixedrange: true,
+            gridcolor: "rgba(255, 255, 255, 0.05)",
+            tickfont: { size: 11, color: "#CBD5E1" }
+        },
+        legend: {
+            orientation: "h",
+            yanchor: "top",
+            y: -0.26,
+            xanchor: "center",
+            x: 0.5,
+            font: { size: 10.5, color: "#E2E8F0" },
+            bgcolor: "rgba(17, 24, 39, 0.8)",
+            bordercolor: "rgba(255, 255, 255, 0.12)",
+            borderwidth: 1
+        }
+    };
+
+    Plotly.newPlot("chartForecast", traces, layout, { responsive: true, displayModeBar: false, scrollZoom: false, doubleClick: false });
+}
+
+// Load Tab 5 Pipeline Diagnostics Data
+async function loadDiagnosticsData() {
+    try {
+        const resp = await fetch(`/api/diagnostics?city=${state.city}`);
+        const data = await resp.json();
+
+        const tbody = document.getElementById("pipelineTableBody");
+        tbody.innerHTML = "";
+
+        data.table_rows.forEach(r => {
+            const tr = document.createElement("tr");
+            tr.innerHTML = `
+                <td>${r.num}</td>
+                <td>${r.time}</td>
+                <td>${r.city}</td>
+                <td>${r.temp}°C</td>
+                <td>${r.temp_anom}°C</td>
+                <td>${r.rain} mm</td>
+                <td>${r.delivery_orders}</td>
+                <td>${r.price_surge}</td>
+                <td>${r.bike_trips}</td>
+                <td>${r.rideshare_trips}</td>
+                <td>${r.dinein_guests}</td>
+                <td>${r.mall_footfall}</td>
+                <td>${r.grid_load}</td>
+                <td>${r.freight_delay}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    } catch (err) {
+        console.error("Failed to load diagnostics:", err);
+    }
+}
