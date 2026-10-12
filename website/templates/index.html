@@ -31,9 +31,24 @@
                 </select>
             </div>
             <div class="portfolio-wrapper">
-                <label>Active Monitored Portfolio (<span id="selectedCount">0</span> selected)</label>
-                <div id="portfolioChips" class="portfolio-chips-container">
-                    <!-- Populated dynamically -->
+                <label for="portfolioDropdownBtn">Active Monitored Portfolio (<span id="selectedCount">0</span> selected)</label>
+                <div class="custom-multiselect" id="portfolioDropdown">
+                    <button type="button" class="multiselect-trigger" id="portfolioDropdownBtn" aria-haspopup="true" aria-expanded="false">
+                        <span class="multiselect-label" id="portfolioSelectedLabel">Select Monitored Businesses...</span>
+                        <span class="multiselect-chevron">&#9662;</span>
+                    </button>
+                    <div class="multiselect-dropdown-menu" id="portfolioDropdownMenu">
+                        <div class="multiselect-header">
+                            <input type="text" id="portfolioSearchInput" placeholder="Filter businesses..." class="multiselect-search" autocomplete="off">
+                            <div class="multiselect-quick-actions">
+                                <button type="button" id="selectAllBizBtn" class="btn-text-action">Select All</button>
+                                <button type="button" id="clearAllBizBtn" class="btn-text-action">Reset</button>
+                            </div>
+                        </div>
+                        <div class="multiselect-items" id="portfolioDropdownItems">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
                 </div>
             </div>
             <div class="header-action-buttons">

@@ -62,6 +62,80 @@ function setupEventListeners() {
         await refreshAllForNewCity();
     });
 
+    // Portfolio Multi-Select Dropdown Toggle & Controls
+    const portfolioDropdown = document.getElementById("portfolioDropdown");
+    const portfolioDropdownBtn = document.getElementById("portfolioDropdownBtn");
+    const portfolioSearchInput = document.getElementById("portfolioSearchInput");
+
+    if (portfolioDropdownBtn) {
+        portfolioDropdownBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            portfolioDropdown.classList.toggle("open");
+            const isOpen = portfolioDropdown.classList.contains("open");
+            portfolioDropdownBtn.setAttribute("aria-expanded", isOpen);
+            if (isOpen && portfolioSearchInput) {
+                portfolioSearchInput.value = "";
+                document.querySelectorAll("#portfolioDropdownItems .multiselect-item").forEach(item => {
+                    item.style.display = "flex";
+                });
+                portfolioSearchInput.focus();
+            }
+        });
+    }
+
+    const portfolioDropdownMenu = document.getElementById("portfolioDropdownMenu");
+    if (portfolioDropdownMenu) {
+        portfolioDropdownMenu.addEventListener("click", (e) => {
+            e.stopPropagation();
+        });
+    }
+
+    document.addEventListener("click", () => {
+        if (portfolioDropdown) {
+            portfolioDropdown.classList.remove("open");
+            if (portfolioDropdownBtn) portfolioDropdownBtn.setAttribute("aria-expanded", "false");
+        }
+    });
+
+    document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && portfolioDropdown) {
+            portfolioDropdown.classList.remove("open");
+            if (portfolioDropdownBtn) portfolioDropdownBtn.setAttribute("aria-expanded", "false");
+        }
+    });
+
+    if (portfolioSearchInput) {
+        portfolioSearchInput.addEventListener("input", (e) => {
+            const query = e.target.value.toLowerCase().trim();
+            document.querySelectorAll("#portfolioDropdownItems .multiselect-item").forEach(item => {
+                const name = item.getAttribute("data-name") || "";
+                item.style.display = name.toLowerCase().includes(query) ? "flex" : "none";
+            });
+        });
+    }
+
+    const selectAllBtn = document.getElementById("selectAllBizBtn");
+    if (selectAllBtn) {
+        selectAllBtn.addEventListener("click", async () => {
+            state.selectedKeys = state.catalog.map(c => c.key);
+            renderPortfolioDropdown();
+            await loadPortfolioData();
+            if (state.activeTab === "tab3") await loadDominoData();
+            if (state.activeTab === "tab4") await loadNowcastData();
+        });
+    }
+
+    const clearAllBtn = document.getElementById("clearAllBizBtn");
+    if (clearAllBtn) {
+        clearAllBtn.addEventListener("click", async () => {
+            state.selectedKeys = ["square_pos", "stripe_payments"];
+            renderPortfolioDropdown();
+            await loadPortfolioData();
+            if (state.activeTab === "tab3") await loadDominoData();
+            if (state.activeTab === "tab4") await loadNowcastData();
+        });
+    }
+
     // Day in Review Select
     document.getElementById("daySelect").addEventListener("change", async (e) => {
         state.inspectedDayIdx = parseInt(e.target.value);
@@ -264,41 +338,82 @@ function resetSimulationToLive() {
     document.getElementById("simTempAnomVal").textContent = `${tempAnom >= 0 ? '+' : ''}${tempAnom.toFixed(1)}°C`;
 }
 
-// Render Portfolio Chips in Control Bar
-function renderPortfolioChips() {
-    const container = document.getElementById("portfolioChips");
+// Update Portfolio Dropdown Trigger Label & Count
+function updatePortfolioDropdownLabel() {
+    const selectedCount = state.selectedKeys.length;
+    const countEl = document.getElementById("selectedCount");
+    if (countEl) countEl.textContent = selectedCount;
+
+    const labelEl = document.getElementById("portfolioSelectedLabel");
+    if (!labelEl) return;
+
+    const selectedItems = state.catalog.filter(item => state.selectedKeys.includes(item.key));
+    if (selectedCount === 0) {
+        labelEl.textContent = "Select Monitored Businesses...";
+    } else if (selectedCount === 1) {
+        labelEl.textContent = selectedItems[0]?.clean_name || "1 Business Selected";
+    } else if (selectedCount === 2) {
+        labelEl.textContent = `${selectedItems[0]?.clean_name || ""}, ${selectedItems[1]?.clean_name || ""}`;
+    } else if (selectedCount === state.catalog.length) {
+        labelEl.textContent = `All Businesses Monitored (${selectedCount} Total)`;
+    } else {
+        const firstTwo = selectedItems.slice(0, 2).map(i => i.clean_name).join(", ");
+        labelEl.textContent = `${selectedCount} Selected: ${firstTwo} (+${selectedCount - 2} more)`;
+    }
+}
+
+// Render Portfolio Multi-Select Dropdown in Control Bar
+function renderPortfolioDropdown() {
+    const container = document.getElementById("portfolioDropdownItems");
+    if (!container) return;
     container.innerHTML = "";
 
     state.catalog.forEach(item => {
         const isSelected = state.selectedKeys.includes(item.key);
-        const chip = document.createElement("div");
-        chip.className = `portfolio-chip ${isSelected ? 'active' : ''}`;
-        chip.innerHTML = `
-            <span class="chip-dot" style="background-color: ${item.color};"></span>
-            <span>${item.clean_name}</span>
+        const row = document.createElement("div");
+        row.className = `multiselect-item ${isSelected ? 'selected' : ''}`;
+        row.setAttribute("data-name", item.clean_name);
+        row.innerHTML = `
+            <input type="checkbox" class="multiselect-checkbox" ${isSelected ? 'checked' : ''}>
+            <span class="multiselect-item-dot" style="background-color: ${item.color};"></span>
+            <span class="multiselect-item-name">${item.clean_name}</span>
+            ${item.is_custom ? '<span class="multiselect-item-badge">Custom</span>' : ''}
         `;
-        chip.addEventListener("click", async () => {
-            if (state.selectedKeys.includes(item.key)) {
+
+        row.addEventListener("click", async (e) => {
+            const checkbox = row.querySelector("input[type='checkbox']");
+            if (e.target !== checkbox) {
+                checkbox.checked = !checkbox.checked;
+            }
+
+            if (checkbox.checked) {
+                if (!state.selectedKeys.includes(item.key)) {
+                    state.selectedKeys.push(item.key);
+                }
+                row.classList.add("selected");
+            } else {
                 if (state.selectedKeys.length <= 1) {
                     alert("Please keep at least one business in your portfolio.");
+                    checkbox.checked = true;
                     return;
                 }
                 state.selectedKeys = state.selectedKeys.filter(k => k !== item.key);
-                chip.classList.remove("active");
-            } else {
-                state.selectedKeys.push(item.key);
-                chip.classList.add("active");
+                row.classList.remove("selected");
             }
-            document.getElementById("selectedCount").textContent = state.selectedKeys.length;
+
+            updatePortfolioDropdownLabel();
             await loadPortfolioData();
             if (state.activeTab === "tab3") await loadDominoData();
             if (state.activeTab === "tab4") await loadNowcastData();
         });
-        container.appendChild(chip);
+
+        container.appendChild(row);
     });
 
-    document.getElementById("selectedCount").textContent = state.selectedKeys.length;
+    updatePortfolioDropdownLabel();
 }
+
+const renderPortfolioChips = renderPortfolioDropdown;
 
 // Render Weather Ribbon
 function renderWeatherRibbon(pkg) {
