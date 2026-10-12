@@ -97,14 +97,6 @@ def get_biz_color(b_key: str, idx: int = 0) -> str:
 
 def get_biz_clean_label(b_key: str, catalog_entry: dict) -> str:
     name = catalog_entry.get("name", b_key) if isinstance(catalog_entry, dict) else str(catalog_entry)
-    if "square_pos" in b_key:
-        return "Square POS"
-    if "stripe" in b_key:
-        return "Stripe Checkout"
-    if "dine_in" in b_key:
-        return "Dine-In Restaurant"
-    if "food_delivery" in b_key:
-        return "On-Demand Food Delivery"
     clean = name.split(" Live")[0].split(" (")[0].strip()
     return clean
 
@@ -722,9 +714,10 @@ def get_auto_connected_merchants(city_code: str):
     res_sq = estimate_empirical_elasticities(df_sq, city_weather_daily, business_name=f"{city_names.get(city_code, city_code)} Square POS (Hospitality)")
     res_st = estimate_empirical_elasticities(df_st, city_weather_daily, business_name=f"{city_names.get(city_code, city_code)} Stripe Gateway (E-Commerce)")
     
+    city_tag = "NYC" if city_code == "NYC" else city_code
     return {
         "square_pos_live": {
-            "name": f"Square POS Live Terminal ({city_names.get(city_code, city_code)})",
+            "name": f"Square POS — {city_tag}",
             "category": "Hospitality & Dining (Auto-Connected)",
             "description": f"Real POS register stream from Square. {res_sq['summary_insight']}",
             "color": "#FFFFFF",
@@ -736,7 +729,7 @@ def get_auto_connected_merchants(city_code: str):
             "temp_elasticity": res_sq["temp_elasticity"]
         },
         "stripe_gateway_live": {
-            "name": f"Stripe Checkout Live Stream ({city_names.get(city_code, city_code)})",
+            "name": f"Stripe Checkout — {city_tag}",
             "category": "E-Commerce & Digital (Auto-Connected)",
             "description": f"Real payment gateway stream from Stripe. {res_st['summary_insight']}",
             "color": "#FFFFFF",
@@ -761,7 +754,7 @@ with ctrl_col1:
         "Live Portfolio",
         options=list(catalog_options.keys()),
         default=[k for k in st.session_state.selected_businesses if k in catalog_options],
-        format_func=lambda x: f"{catalog_options[x]} [{active_catalog[x].get('category', 'General')}]"
+        format_func=lambda x: catalog_options[x]
     )
     st.session_state.selected_businesses = selected_keys
 
@@ -923,7 +916,7 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "Historical Trends & Seasonality",
     "Business Interactions & Domino Chains",
     "Live Scenario Simulator & AI Guidance",
-    "Multi-Source Data Wrangling Diagnostics"
+    "Data Sources & Processing"
 ])
 
 
@@ -1190,14 +1183,19 @@ with tab2:
     horizon = st.selectbox("Timeline Range:", ["Last 3 Months (90 Days)", "Last 6 Months (180 Days)", "Full 2 Years (All Data)"], index=1)
     if "3 Months" in horizon:
         df_lt = city_daily_custom.tail(90).copy()
+        dtick_setting = "M1"
     elif "6 Months" in horizon:
         df_lt = city_daily_custom.tail(180).copy()
+        dtick_setting = "M2"
     else:
         df_lt = city_daily_custom.copy()
+        dtick_setting = "M2"
         
+    df_lt["week_start"] = df_lt["date"].dt.to_period("W").dt.start_time
     df_lt["year_week"] = df_lt["date"].dt.to_period("W").astype(str)
     
     agg_dict = {
+        "week_start": "min",
         "precip_accumulation_mm": "sum",
         "air_temp_deg_c": "mean"
     }
@@ -1206,7 +1204,9 @@ with tab2:
             agg_dict[f"{b_key}_actual_rev"] = "sum"
             agg_dict[f"{b_key}_baseline_rev"] = "sum"
         
-    weekly_lt = df_lt.groupby("year_week").agg(agg_dict).reset_index()
+    weekly_lt = df_lt.groupby("year_week", as_index=False).agg(agg_dict)
+    weekly_lt = weekly_lt.sort_values("week_start").reset_index(drop=True)
+    weekly_lt["date_display"] = weekly_lt["week_start"].dt.strftime("%b %d, %Y")
     
     fig_lt = make_subplots(
         rows=2, cols=1,
@@ -1226,24 +1226,25 @@ with tab2:
         
         cdata_lt = np.column_stack([
             [cfg['name']] * len(weekly_lt),
-            weekly_lt["year_week"],
+            weekly_lt["date_display"],
             weekly_lt["air_temp_deg_c"],
             weekly_lt["precip_accumulation_mm"],
-            weekly_lt[f"{b_key}_baseline_rev"]
+            weekly_lt[f"{b_key}_baseline_rev"],
+            weekly_lt["year_week"]
         ])
         
         fig_lt.add_trace(go.Scatter(
-            x=weekly_lt["year_week"],
+            x=weekly_lt["week_start"],
             y=weekly_lt[f"{b_key}_actual_rev"],
             mode="lines+markers",
             name=biz_label,
             legendgroup=b_key,
             line=dict(color=biz_color, width=2.8, dash="solid"),
-            marker=dict(size=7, color=biz_color, symbol=biz_sym),
+            marker=dict(size=6, color=biz_color, symbol=biz_sym),
             customdata=cdata_lt,
             hovertemplate=(
                 "<b>%{customdata[0]}</b><br>"
-                "Week: %{customdata[1]}<br>"
+                "Date: %{customdata[1]} (%{customdata[5]})<br>"
                 "Climate: %{customdata[2]:.1f}°C avg, %{customdata[3]:.1f} mm rain<br>"
                 "Weekly Earned Sales: $%{y:,.0f}<br>"
                 "Normal Baseline: $%{customdata[4]:,.0f}<extra></extra>"
@@ -1252,12 +1253,13 @@ with tab2:
         
     cdata_lt_rain = np.column_stack([
         ["Precipitation"] * len(weekly_lt),
-        weekly_lt["year_week"],
+        weekly_lt["date_display"],
         weekly_lt["air_temp_deg_c"],
-        weekly_lt["precip_accumulation_mm"]
+        weekly_lt["precip_accumulation_mm"],
+        weekly_lt["year_week"]
     ])
     fig_lt.add_trace(go.Scatter(
-        x=weekly_lt["year_week"],
+        x=weekly_lt["week_start"],
         y=weekly_lt["precip_accumulation_mm"],
         mode="lines",
         name="Rainfall (mm)",
@@ -1268,7 +1270,7 @@ with tab2:
         customdata=cdata_lt_rain,
         hovertemplate=(
             "<b>Weekly Rainfall</b><br>"
-            "Week: %{customdata[1]}<br>"
+            "Date: %{customdata[1]} (%{customdata[4]})<br>"
             "Total Rain: %{y:.1f} mm<extra></extra>"
         )
     ), row=2, col=1)
@@ -1286,20 +1288,64 @@ with tab2:
         borderpad=4
     )
     
-    fig_lt.for_each_annotation(lambda a: a.update(font=dict(size=12, color="#E2E8F0")))
+    # Configure shared x-axis with simplified bi-monthly short month labels
+    fig_lt.update_xaxes(
+        type="date",
+        dtick=dtick_setting,
+        tickformat="%b",
+        tickangle=0,
+        showgrid=True,
+        gridcolor="rgba(56, 189, 248, 0.08)",
+        tickfont=dict(size=10.5, color="#CBD5E1")
+    )
+    
+    # Calendar year vertical separators & year labels underneath relevant section
+    min_date = weekly_lt["week_start"].min()
+    max_date = weekly_lt["week_start"].max()
+    all_years = sorted(weekly_lt["week_start"].dt.year.unique())
+    main_years = [y for y in all_years if len(weekly_lt[weekly_lt["week_start"].dt.year == y]) >= 3]
+    if not main_years and all_years:
+        main_years = all_years
+        
+    for y in all_years:
+        y_boundary = pd.Timestamp(f"{y}-01-01")
+        if y_boundary > min_date and y_boundary <= max_date:
+            fig_lt.add_vline(
+                x=y_boundary,
+                line_width=1.0,
+                line_dash="dash",
+                line_color="rgba(148, 163, 184, 0.28)"
+            )
+            
+    for y in main_years:
+        y_weeks = weekly_lt[weekly_lt["week_start"].dt.year == y]
+        if len(y_weeks) > 0:
+            mid_ts = y_weeks["week_start"].iloc[len(y_weeks) // 2]
+            fig_lt.add_annotation(
+                x=mid_ts,
+                y=-0.17,
+                xref="x2",
+                yref="paper",
+                text=f"<span style='color:#38BDF8; font-weight:700; font-size:11px; letter-spacing:0.04em;'>{y}</span>",
+                showarrow=False,
+                xanchor="center",
+                yanchor="top"
+            )
+            
+    fig_lt.for_each_annotation(lambda a: a.update(font=dict(size=12, color="#E2E8F0")) if a.text and "Weekly" in a.text else None)
     fig_lt.update_layout(
         template="plotly_dark",
         paper_bgcolor="#111827",
         plot_bgcolor="#111827",
         font=dict(family="Plus Jakarta Sans, sans-serif", size=11, color="#F8FAFC"),
-        height=530,
-        margin=dict(l=15, r=15, t=40, b=120),
+        height=550,
+        margin=dict(l=15, r=15, t=40, b=150),
         yaxis=dict(title="Revenue ($)", gridcolor="rgba(56, 189, 248, 0.10)", zeroline=False),
         yaxis2=dict(title="Rain (mm)", gridcolor="rgba(56, 189, 248, 0.10)", zeroline=False),
         legend=dict(
             orientation="h",
             yanchor="top",
-            y=-0.26,
+            y=-0.32,
             xanchor="center",
             x=0.5,
             font=dict(size=10.5, color="#E2E8F0"),
@@ -1311,22 +1357,10 @@ with tab2:
     )
     st.plotly_chart(fig_lt, use_container_width=True)
     
-    st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='height: 14px;'></div>", unsafe_allow_html=True)
     
-    # Explanatory Box: Disentangling True Weather vs Seasonality
-    st.markdown("""
-    <div class="ripple-box">
-        <div class="ripple-title">Why Standard Correlations Are Misleading (True Weather vs. Seasonal Confounders)</div>
-        <div style="font-size: 0.86rem; color: #CBD5E1; line-height: 1.6; margin-top: 8px;">
-            Food delivery and retail sales naturally spike on Friday/Saturday evenings and winter holiday periods. A standard naive correlation falsely attributes normal calendar spikes to rain.
-            <br/><br/>
-            <strong>How We Fix This:</strong> We apply <strong>Two-Way Fixed Effects (TWFE) Panel Regressions</strong> with <em>Day-of-Week &times; Hour-of-Day &times; Month &times; Holiday</em> controls. This removes calendar baselines to measure true isolated weather alpha.
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    with st.expander("More Technicalities — Historical Econometric Comparison Table"):
-        st.markdown("This table compares simple raw correlation against true econometric impact after removing calendar bias (indexed 1 through N).")
+    with st.expander("View All Metrics & Model Results"):
+        st.markdown("This table compares simple raw correlation against seasonality-adjusted econometric impact after removing calendar bias.")
         comp_df = engine.get_naive_vs_fixed_effects_comparison()
         comp_df.index = range(1, len(comp_df) + 1)
         comp_df.index.name = "#"
@@ -1439,7 +1473,7 @@ with tab3:
             ripple_html = f'<div class="ripple-box"><div style="display: flex; justify-content: space-between; align-items: center;"><span class="ripple-title">{link_title}</span><span class="status-neutral">{link_type}</span></div><div style="font-size: 0.90rem; font-weight: 700; color: #38BDF8; margin: 6px 0 10px 0;">{link_summary}</div><div style="margin-top: 8px;">{steps_html}</div></div>'
             st.markdown(ripple_html, unsafe_allow_html=True)
     else:
-        st.info("Select complementary businesses (such as Square POS and Stripe, or Dine-In Restaurant and Food Delivery) to view substitution flows.")
+        st.info("Select complementary businesses (such as Square POS and Stripe Checkout, or Restaurants & Bistros and Food Delivery) to view substitution flows.")
         
     st.markdown("<div style='height: 16px;'></div>", unsafe_allow_html=True)
     st.markdown("#### Past 30 Days Net Weather Sales Shift ($ USD)")
@@ -1718,20 +1752,20 @@ with tab4:
 
 
 # ==============================================================================
-# TAB 5: MULTI-SOURCE DATA WRANGLING DIAGNOSTICS
+# TAB 5: DATA SOURCES & PROCESSING
 # ==============================================================================
 with tab5:
-    st.subheader("Data Pipeline Diagnostics & Source Integration")
+    st.subheader("Data Sources & Processing")
     
     p1, p2, p3 = st.columns(3)
     with p1:
         st.markdown("""
         <div class="sector-grid-card" style="padding: 12px 14px; margin-bottom: 8px;">
-            <div class="sector-title" style="margin-bottom: 6px; font-size: 0.88rem;">1. Timezone & Spatial Ingestion</div>
+            <div class="sector-title" style="margin-bottom: 6px; font-size: 0.88rem;">1. Time & Location Alignment</div>
             <div style="font-size: 0.82rem; color: #CBD5E1; line-height: 1.5;">
-                • <strong>4 IANA Timezones:</strong> Harmonized NY, Chicago, LA, Phoenix to UTC.<br/>
-                • <strong>DST Resilient:</strong> Safe fold transitions without dropped intervals.<br/>
-                • <strong>Standard Index:</strong> Unified spatial-temporal index across regions.
+                • <strong>4 Cities:</strong> Data aligned across New York, Chicago, Los Angeles, and Phoenix.<br/>
+                • <strong>Time Accuracy:</strong> Accounts for time zones and daylight saving changes.<br/>
+                • <strong>Consistent Timeline:</strong> Aligns weather and business data by time and location.
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -1739,11 +1773,11 @@ with tab5:
     with p2:
         st.markdown("""
         <div class="sector-grid-card" style="padding: 12px 14px; margin-bottom: 8px;">
-            <div class="sector-title" style="margin-bottom: 6px; font-size: 0.88rem;">2. Asynchronous Fusion & Resampling</div>
+            <div class="sector-title" style="margin-bottom: 6px; font-size: 0.88rem;">2. Data Integration & Preparation</div>
             <div style="font-size: 0.82rem; color: #CBD5E1; line-height: 1.5;">
-                • <strong>Multi-Source Scale:</strong> Merged <strong>69,106 weather rows</strong> + <strong>279,249 15-min POS events</strong>.<br/>
-                • <strong>Gap Imputation:</strong> Cubic spline interpolation & forward-fill windowing.<br/>
-                • <strong>Temporal Grain:</strong> Volume-weighted resampling to 1-hour intervals.
+                • <strong>Data Combined:</strong> 69,106 weather records and 279,249 point-of-sale events.<br/>
+                • <strong>Missing Data:</strong> Fills data gaps using interpolation and previous recorded values.<br/>
+                • <strong>Hourly Summaries:</strong> Converts 15-minute sales records into hourly totals.
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -1751,11 +1785,11 @@ with tab5:
     with p3:
         st.markdown("""
         <div class="sector-grid-card" style="padding: 12px 14px; margin-bottom: 8px;">
-            <div class="sector-title" style="margin-bottom: 6px; font-size: 0.88rem;">3. Feature Engineering & Baselines</div>
+            <div class="sector-title" style="margin-bottom: 6px; font-size: 0.88rem;">3. Weather & Business Metrics</div>
             <div style="font-size: 0.82rem; color: #CBD5E1; line-height: 1.5;">
-                • <strong>Temp Anomaly:</strong> Actual Temp − 30-day Rolling Seasonal Mean.<br/>
-                • <strong>Degree Days:</strong> Dynamic CDD/HDD heating & cooling loads.<br/>
-                • <strong>21 Sector Targets:</strong> Cross-sector metrics across 4 climatic zones.
+                • <strong>Temperature Anomaly:</strong> Measures how temperatures differ from recent seasonal conditions.<br/>
+                • <strong>Heating & Cooling Demand:</strong> Estimates heating and cooling needs using temperature data.<br/>
+                • <strong>21 Business Metrics:</strong> Tracks performance across 21 sectors in 4 climate regions.
             </div>
         </div>
         """, unsafe_allow_html=True)

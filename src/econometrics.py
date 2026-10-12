@@ -72,6 +72,7 @@ class WeatherEconometricsEngine:
                 rain_pval = model.pvalues.get("precip_accumulation_mm", 1.0)
                 snow_coef = model.params.get("snow_depth_delta_cm", 0.0)
                 temp_shock_coef = model.params.get("temp_anomaly_deg_c", 0.0)
+                temp_pval = model.pvalues.get("temp_anomaly_deg_c", 1.0)
                 wind_coef = model.params.get("sustained_wind_kmh", 0.0)
                 r_squared = model.rsquared
                 
@@ -90,6 +91,7 @@ class WeatherEconometricsEngine:
                     "snow_coef_per_cm": round(float(snow_coef), 3),
                     "temp_shock_coef_per_c": round(float(temp_shock_coef), 3),
                     "temp_shock_pct_per_c": round(float(temp_pct_impact), 2),
+                    "temp_pvalue": float(temp_pval),
                     "wind_coef_per_kmh": round(float(wind_coef), 3),
                     "r_squared": round(float(r_squared), 3),
                     "naive_corr_precip": round(float(naive_corr_precip), 3),
@@ -103,45 +105,69 @@ class WeatherEconometricsEngine:
     def get_naive_vs_fixed_effects_comparison(self):
         """
         Creates a clean, layman-friendly comparison table.
-        Column headers: Business Metric, Normal Daily Average, Temp, Real Temp Impact, Rain, Real Rain Impact, Prediction Accuracy, Reliable Effect
+        Features side-by-side raw correlation vs seasonality-adjusted weather impact,
+        explicit units for normal daily averages, true R² model fit accuracy,
+        and statistical reliability based on uncertainty thresholds (p < 0.05).
         """
-        name_map = {
-            "delivery_order_count": "Food Delivery Orders",
-            "active_couriers": "Active Delivery Drivers",
-            "surge_pricing_mult": "Price Surge Multiplier",
-            "delivery_duration_min": "Delivery Wait Time (Mins)",
-            "cancellation_rate_pct": "Order Cancellation Rate",
-            "bikeshare_trips_count": "Bike-Share Rental Trips",
-            "public_transit_ridership": "Bus & Subway Riders",
-            "rideshare_trip_count": "Taxi & Rideshare Trips",
-            "traffic_congestion_pct": "Road Traffic Jam Level",
-            "retail_mall_footfall": "Retail Store Foot Traffic",
-            "rainwear_sales_idx": "Umbrella & Rainwear Sales",
-            "winter_apparel_idx": "Winter Coat & Apparel Sales",
-            "ecommerce_orders_count": "Online Shopping Orders",
-            "restaurant_dinein_guests": "Restaurant Dine-In Diners",
-            "patio_occupancy_pct": "Outdoor Patio Seating",
-            "hot_comfort_food_idx": "Hot Soup & Comfort Food Sales",
-            "cold_beverage_icecream_idx": "Cold Drinks & Ice Cream Sales",
-            "electricity_grid_load_mw": "Power Grid Electricity Usage",
-            "hvac_demand_idx": "Air Conditioning & Heating Load",
-            "freight_delay_min": "Highway Truck Delivery Delays",
-            "warehouse_shipments_count": "Warehouse Outbound Shipments"
+        metric_metadata = {
+            "delivery_order_count": ("Food Delivery Orders", "orders/day"),
+            "active_couriers": ("Active Delivery Couriers", "couriers/day"),
+            "surge_pricing_mult": ("Surge Pricing Multiplier", "multiplier"),
+            "delivery_duration_min": ("Delivery Wait Time", "mins"),
+            "cancellation_rate_pct": ("Order Cancellation Rate", "%"),
+            "bikeshare_trips_count": ("Bike-Share Rental Trips", "trips/day"),
+            "public_transit_ridership": ("Public Transit Ridership", "riders/day"),
+            "rideshare_trip_count": ("Rideshare Trips", "rides/day"),
+            "traffic_congestion_pct": ("Traffic Congestion Level", "%"),
+            "retail_mall_footfall": ("Retail Mall Foot Traffic", "visitors/day"),
+            "rainwear_sales_idx": ("Rainwear & Umbrella Sales Index", "index"),
+            "winter_apparel_idx": ("Winter Apparel Sales Index", "index"),
+            "ecommerce_orders_count": ("Online Shopping Orders", "orders/day"),
+            "restaurant_dinein_guests": ("Restaurant Dine-In Guests", "guests/day"),
+            "patio_occupancy_pct": ("Outdoor Patio Occupancy", "%"),
+            "hot_comfort_food_idx": ("Hot Soup & Comfort Food Index", "index"),
+            "cold_beverage_icecream_idx": ("Cold Drinks & Ice Cream Index", "index"),
+            "electricity_grid_load_mw": ("Power Grid Electricity Load", "MW"),
+            "hvac_demand_idx": ("HVAC Energy Demand Index", "index"),
+            "freight_delay_min": ("Highway Freight Transit Delays", "mins"),
+            "warehouse_shipments_count": ("Warehouse Outbound Shipments", "shipments/day")
         }
         
         records = []
         for target, stats in self.elasticities.items():
-            display_name = name_map.get(target, target.replace("_", " ").title())
+            disp_name, unit = metric_metadata.get(target, (target.replace("_", " ").title(), "units"))
+            
+            # Format baseline value with appropriate unit
+            base_val = stats["mean_baseline"]
+            if unit == "%":
+                base_str = f"{base_val:.1f}%"
+            elif unit == "multiplier":
+                base_str = f"{base_val:.2f}x"
+            elif unit == "mins":
+                base_str = f"{base_val:.1f} mins"
+            else:
+                base_str = f"{base_val:,.1f} {unit}"
+                
+            # Statistical reliability (threshold p < 0.05)
+            p_val_rain = stats.get("rain_pvalue")
+            if p_val_rain is None or np.isnan(p_val_rain):
+                reliability = "Insufficient evidence"
+            elif p_val_rain < 0.05:
+                reliability = "Statistically Significant (p < 0.05)"
+            else:
+                reliability = "Insufficient evidence (p ≥ 0.05)"
+                
             records.append({
-                "Business Metric": display_name,
-                "Normal Daily Average": f"{stats['mean_baseline']:,.1f}",
-                "Temp": stats["naive_corr_temp"],
-                "Real Temp Impact": f"{stats['temp_shock_pct_per_c']:+.2f}%",
-                "Rain": stats["naive_corr_precip"],
-                "Real Rain Impact": f"{stats['rain_pct_per_mm']:+.2f}%",
-                "Prediction Accuracy": f"{int(stats['r_squared']*100)}%",
-                "Reliable Effect": "Yes" if stats["rain_pvalue"] < 0.01 else "No"
+                "Business Metric": disp_name,
+                "Normal Daily Average": base_str,
+                "Raw Temperature Correlation (r)": stats["naive_corr_temp"],
+                "Adjusted Temperature Impact (% change / °C)": f"{stats['temp_shock_pct_per_c']:+.2f}%",
+                "Raw Rain Correlation (r)": stats["naive_corr_precip"],
+                "Adjusted Rain Impact (% change / mm)": f"{stats['rain_pct_per_mm']:+.2f}%",
+                "Model Fit (R²)": f"{stats['r_squared']:.1%}",
+                "Reliable Effect (p < 0.05)": reliability
             })
+            
         df_out = pd.DataFrame(records)
         df_out.index = range(1, len(df_out) + 1)
         df_out.index.name = "#"

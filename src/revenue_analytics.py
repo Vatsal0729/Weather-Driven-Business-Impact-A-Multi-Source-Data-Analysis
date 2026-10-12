@@ -10,7 +10,7 @@ import re
 
 BUSINESS_CATALOG = {
     "food_delivery": {
-        "name": "On-Demand Food Delivery",
+        "name": "Food Delivery",
         "category": "Logistics & Delivery",
         "description": "On-demand food and grocery ordering platform with courier network.",
         "color": "#00D2FF",  # Bright Cyan Blue (High Visibility)
@@ -22,7 +22,7 @@ BUSINESS_CATALOG = {
         "temp_elasticity": -0.015,
     },
     "dine_in_restaurant": {
-        "name": "Dine-In Restaurant & Bistro",
+        "name": "Restaurants & Bistros",
         "category": "Hospitality & Dining",
         "description": "Sit-down restaurant with dining room and outdoor patio seating.",
         "color": "#FF9100",  # Vivid Amber Orange (High Visibility)
@@ -34,7 +34,7 @@ BUSINESS_CATALOG = {
         "temp_elasticity": 0.012,
     },
     "retail_apparel": {
-        "name": "Retail Clothing & Rainwear Store",
+        "name": "Clothing & Rainwear",
         "category": "Retail & Commerce",
         "description": "Brick-and-mortar apparel store selling seasonal & weather apparel.",
         "color": "#B388FF",  # Electric Lavender Purple (High Visibility)
@@ -46,7 +46,7 @@ BUSINESS_CATALOG = {
         "temp_elasticity": -0.020,
     },
     "rideshare_fleet": {
-        "name": "Urban Rideshare & Taxi Fleet",
+        "name": "Taxi & Rideshare",
         "category": "Urban Mobility",
         "description": "City ridesharing & on-demand private mobility transport.",
         "color": "#00E676",  # Vibrant Emerald Green (High Visibility)
@@ -58,7 +58,7 @@ BUSINESS_CATALOG = {
         "temp_elasticity": -0.010,
     },
     "ice_cream_beverages": {
-        "name": "Ice Cream & Cold Beverage Parlor",
+        "name": "Ice Cream & Cold Drinks",
         "category": "Food & Beverage",
         "description": "Gelato, frozen treats, and iced refreshment parlors.",
         "color": "#00E5FF",  # Bright Turquoise Aqua (High Visibility)
@@ -70,7 +70,7 @@ BUSINESS_CATALOG = {
         "temp_elasticity": 0.058,
     },
     "hot_cafe_bakery": {
-        "name": "Hot Cafe & Comfort Food Bakery",
+        "name": "Cafés & Bakeries",
         "category": "Food & Beverage",
         "description": "Artisan coffee, hot soups, and fresh warm bakery pastries.",
         "color": "#FF5252",  # Vivid Coral Red (High Visibility)
@@ -94,7 +94,7 @@ BUSINESS_CATALOG = {
         "temp_elasticity": 0.035,
     },
     "freight_logistics": {
-        "name": "Freight & Last-Mile Logistics",
+        "name": "Freight & Delivery Logistics",
         "category": "Supply Chain",
         "description": "Inter-city trucking and regional warehouse dispatch operations.",
         "color": "#E040FB",  # Vibrant Magenta (High Visibility)
@@ -106,7 +106,7 @@ BUSINESS_CATALOG = {
         "temp_elasticity": -0.005,
     },
     "movie_theaters": {
-        "name": "Movie Theaters & Indoor Entertainment",
+        "name": "Cinemas & Indoor Entertainment",
         "category": "Entertainment & Leisure",
         "description": "Cinema multiplexes, bowling alleys, and indoor gaming arcades.",
         "color": "#FF4081",  # Hot Pink (High Visibility)
@@ -118,7 +118,7 @@ BUSINESS_CATALOG = {
         "temp_elasticity": -0.018,
     },
     "gym_fitness": {
-        "name": "Gyms & Indoor Fitness Centers",
+        "name": "Gyms & Fitness Centers",
         "category": "Health & Wellness",
         "description": "Membership health clubs, indoor studios, and gym facilities.",
         "color": "#448AFF",  # Bright Royal Blue (High Visibility)
@@ -130,7 +130,7 @@ BUSINESS_CATALOG = {
         "temp_elasticity": -0.022,
     },
     "car_wash": {
-        "name": "Car Wash & Auto Detailing",
+        "name": "Car Wash & Detailing",
         "category": "Automotive Services",
         "description": "Automated and full-service vehicle washing facilities.",
         "color": "#1DE9B6",  # Seafoam Teal (High Visibility)
@@ -142,7 +142,7 @@ BUSINESS_CATALOG = {
         "temp_elasticity": 0.025,
     },
     "golf_theme_park": {
-        "name": "Outdoor Golf & Theme Parks",
+        "name": "Golf & Theme Parks",
         "category": "Outdoor Recreation",
         "description": "Golf courses, amusement parks, and outdoor attraction venues.",
         "color": "#00C853",  # Deep Grass Green (High Visibility)
@@ -154,7 +154,7 @@ BUSINESS_CATALOG = {
         "temp_elasticity": 0.045,
     },
     "pharmacy_clinics": {
-        "name": "Pharmacy & Urgent Care Clinics",
+        "name": "Pharmacies & Urgent Care",
         "category": "Healthcare & Pharma",
         "description": "Retail pharmacies, walk-in urgent care, and medical dispensaries.",
         "color": "#FF1744",  # High-Vis Crimson (High Visibility)
@@ -166,7 +166,7 @@ BUSINESS_CATALOG = {
         "temp_elasticity": -0.038,
     },
     "hvac_home_services": {
-        "name": "HVAC & Home Repair Services",
+        "name": "HVAC & Home Repair",
         "category": "Home Services & Utilities",
         "description": "Emergency air conditioning, furnace heating, and plumbing services.",
         "color": "#FF6D00",  # Bright Tangerine Orange (High Visibility)
@@ -178,7 +178,7 @@ BUSINESS_CATALOG = {
         "temp_elasticity": 0.065,
     },
     "grocery_supermarket": {
-        "name": "Grocery & Supermarket Stores",
+        "name": "Grocery Stores",
         "category": "Retail & Grocery",
         "description": "Large-format grocery stores, food marts, and essential staples.",
         "color": "#FFD600",  # High-Vis Lemon Gold (High Visibility)
@@ -190,7 +190,7 @@ BUSINESS_CATALOG = {
         "temp_elasticity": -0.008,
     },
     "ecommerce_retail": {
-        "name": "E-Commerce & Online Marketplace",
+        "name": "E-Commerce Marketplaces",
         "category": "Digital Commerce",
         "description": "Direct-to-consumer online shopping and package fulfillment.",
         "color": "#7C4DFF",  # Bright Electric Violet (High Visibility)
@@ -959,7 +959,7 @@ def analyze_inter_business_linkages(active_keys, row, custom_catalog=None):
         deliv_delta = row.get("food_delivery_net_impact", 0.0)
         if dine_delta < 0 and deliv_delta > 0:
             linkages.append({
-                "title": "Customer Switch: Dine-In Restaurant to Food Delivery",
+                "title": "Customer Switch: Restaurants & Bistros to Food Delivery",
                 "summary": f"Dine-in lost -${abs(dine_delta):,.0f} in tables, while Food Delivery gained +${deliv_delta:,.0f} in orders.",
                 "chain_steps": [
                     "Step 1: Wet or freezing weather prompts diners to cancel evening table reservations.",
